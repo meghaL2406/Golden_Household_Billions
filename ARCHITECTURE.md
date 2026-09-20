@@ -413,10 +413,20 @@ flowchart LR
 ```
 
 - Stage 1 of the root `Dockerfile` builds the frontend with `VITE_API_URL=""`; stage 2 installs the
-  backend and copies the build to `/app/web`. `app/main.py` serves it only when that directory exists.
-- One origin ⇒ no CORS, no service URL to configure. `render.yaml` declares the service and the
-  database; `render.env` is the equivalent for a manual setup.
-- Files written to `uploads/` are lost on redeploy (ephemeral disk); Cloudinary is the durable option.
+  backend, PostgreSQL 17 and copies the build to `/app/web`. `app/main.py` serves it only when that
+  directory exists.
+- One origin ⇒ no CORS, no service URL to configure.
+- **Zero-configuration mode.** `docker-entrypoint.sh` starts as root only to take ownership of
+  `/app/data`, drops to `appuser`, and then: if `DATABASE_URL` is empty it initialises and starts an
+  embedded PostgreSQL on loopback (`/app/data/pgdata`) and points the app at it; if `JWT_SECRET` is
+  empty it generates one and keeps it in `/app/data/jwt_secret`; with `SEED_ON_BOOT=true` (default)
+  it loads the demo data when the database has no users; finally it runs uvicorn and stops both
+  processes cleanly on `SIGTERM`. Uploads are symlinked into `/app/data/uploads`, so one mounted
+  disk at `/app/data` persists database, documents and secret together.
+- `render.yaml` (Blueprint) provisions managed Postgres and injects `DATABASE_URL`, in which case
+  the embedded server is never started; `render.env` lists optional overrides for a manual setup.
+- On Render's ephemeral disk without a mounted Disk, embedded data and local uploads are lost on
+  every deploy or restart; managed Postgres and Cloudinary are the durable options.
 
 ### Two services (alternative)
 
@@ -437,7 +447,7 @@ All settings are read by `app/core/config.py` from environment variables or `bac
 
 | Variable | Role |
 |---|---|
-| `DATABASE_URL` | Postgres URL; `postgres://` is rewritten to `postgresql+psycopg://` |
+| `DATABASE_URL` | Postgres URL; `postgres://` is rewritten to `postgresql+psycopg://`. Required outside the single-service image; there, empty means "start the embedded PostgreSQL" |
 | `JWT_SECRET`, `JWT_EXPIRE_MINUTES` | Token signing and lifetime |
 | `DEV_MODE`, `DEMO_OTP` | Fixed, echoed OTP for demos |
 | `CORS_ORIGINS` | Comma-separated origins; unnecessary in the single-service deploy |

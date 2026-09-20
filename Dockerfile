@@ -18,12 +18,13 @@ RUN echo "VITE_API_URL=" > .env.production
 RUN npm run build
 
 # ---------------------------------------------------------------- stage 2: backend + serve the build
-FROM python:3.12-slim
+# Pinned to a Debian release so the PostgreSQL package version below stays valid.
+FROM python:3.12-slim-trixie
 
-# postgresql-15: embedded database used only when DATABASE_URL is not provided (pg_trgm is included).
+# postgresql-17: embedded database used only when DATABASE_URL is not provided (pg_trgm is included).
 # libpq5 for psycopg; curl for the HEALTHCHECK.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl libpq5 postgresql-15 \
+    && apt-get install -y --no-install-recommends curl libpq5 postgresql-17 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -46,7 +47,7 @@ ENV PORT=8000 \
     WEB_CONCURRENCY=2 \
     DATA_DIR=/app/data \
     PGDATA=/app/data/pgdata \
-    PG_BIN=/usr/lib/postgresql/15/bin \
+    PG_BIN=/usr/lib/postgresql/17/bin \
     SEED_ON_BOOT=true \
     PYTHONUNBUFFERED=1
 

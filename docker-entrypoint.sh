@@ -17,7 +17,10 @@ set -eu
 
 DATA_DIR="${DATA_DIR:-/app/data}"
 PGDATA="${PGDATA:-$DATA_DIR/pgdata}"
-PG_BIN="${PG_BIN:-/usr/lib/postgresql/15/bin}"
+# Resolve the PostgreSQL binaries even if the packaged major version changes.
+if [ -z "${PG_BIN:-}" ] || [ ! -x "${PG_BIN}/pg_ctl" ]; then
+  PG_BIN="$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1)"
+fi
 APP_USER="appuser"
 APP_UID="10001"
 
@@ -32,7 +35,10 @@ if [ "$(id -u)" = "0" ]; then
     chown -R "$APP_USER:$APP_USER" "$DATA_DIR"
   fi
   chown "$APP_USER:$APP_USER" /app 2>/dev/null || true
-  exec runuser -u "$APP_USER" -- "$0" "$@"
+  # setpriv exec's in place (no intermediate parent process), so this shell stays PID 1 and its
+  # signal trap below produces a clean exit code on SIGTERM.
+  export HOME="/home/$APP_USER"
+  exec setpriv --reuid="$APP_UID" --regid="$APP_UID" --init-groups -- "$0" "$@"
 fi
 
 # Uploads live on the persistent data dir; the application writes to /app/uploads.

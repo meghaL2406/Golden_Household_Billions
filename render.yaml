@@ -1,21 +1,26 @@
-# Render Blueprint — one Web Service (backend + built frontend in a single container, built from the
-# root Dockerfile) plus one managed Postgres database. Review it in the Render dashboard before
-# applying. Nothing here depends on a URL that is only known after deploy: the frontend is served by
-# the backend on the same origin, so there is no CORS or API-URL wiring to do (see DEPLOY.md).
+# Render Blueprint — one Web Service (API + built frontend, built from the root Dockerfile) plus one
+# managed PostgreSQL database. Zero prompts: every value is fixed, generated, or wired from the
+# database, so "New → Blueprint → pick this repo → Apply" is the whole procedure.
+#
+# Without the blueprint (New → Web Service, Docker, this repo) the same image also works with no
+# environment variables at all: it starts an embedded PostgreSQL inside the container. That is fine
+# for demos; use this blueprint (managed Postgres) when data must survive deploys — see DEPLOY.md.
 databases:
   - name: familyid-db
     databaseName: familyid
-    plan: free
+    user: familyid
+    plan: free            # Render's free Postgres expires after 30 days; use a paid plan for longer runs
     postgresMajorVersion: "16"
 
 services:
   - type: web
     name: familyid
-    env: docker
+    runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
     plan: free
     healthCheckPath: /api/health
+    autoDeploy: true
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -25,36 +30,37 @@ services:
         generateValue: true
       - key: JWT_EXPIRE_MINUTES
         value: "720"
+      # Demo mode: the fixed OTP below is accepted and echoed by the API, because no SMS gateway is
+      # wired in. Set DEV_MODE=false only once real OTP delivery (SMTP for email) is configured.
       - key: DEV_MODE
-        value: "false"
+        value: "true"
       - key: DEMO_OTP
         value: "123456"
-      # Not needed for the app's own requests (same origin). Only set this if another site or a
-      # custom-domain frontend must call the API cross-origin.
+      # Same origin for API and frontend: CORS is not needed for the app itself.
       - key: CORS_ORIGINS
         value: ""
-      # Leave blank to store uploaded documents on local (ephemeral) disk; set all three to use
-      # Cloudinary instead, which is strongly recommended in production — see DEPLOY.md.
-      - key: CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
-      # Leave blank to disable email OTP delivery (mobile OTP still works).
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASSWORD
-        sync: false
-      - key: SMTP_FROM
-        value: noreply@familyid.gov.in
-      # Loads the demo dataset on first boot only if the database is still empty. Never leave this
-      # "true" long-term, and never combine with SEED_RESET=true against real data.
+      # Loads the demo dataset when the database has no users; a no-op afterwards.
       - key: SEED_ON_BOOT
         value: "true"
       - key: SEED_RESET
         value: "false"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      # Optional integrations, off by default. Fill in later from the dashboard if wanted:
+      # Cloudinary keeps uploaded documents across deploys; SMTP enables email OTP.
+      - key: CLOUDINARY_CLOUD_NAME
+        value: ""
+      - key: CLOUDINARY_API_KEY
+        value: ""
+      - key: CLOUDINARY_API_SECRET
+        value: ""
+      - key: SMTP_HOST
+        value: ""
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        value: ""
+      - key: SMTP_PASSWORD
+        value: ""
+      - key: SMTP_FROM
+        value: noreply@familyid.gov.in

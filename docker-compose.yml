@@ -1,6 +1,9 @@
-# Local run of the production image: the single-service container (root Dockerfile) plus Postgres.
-# This is the same image Render builds, so what works here works there.
+# Local run of the production image: the single-service container (root Dockerfile) plus a separate
+# Postgres, i.e. the managed-database shape used by the Render blueprint.
 #   docker compose up --build         →  http://localhost:8000  (API docs at /docs)
+#
+# The image also runs with no database and no variables at all (embedded PostgreSQL), exactly as a
+# plain Render Web Service would:   docker build -t familyid . && docker run --rm -p 8000:8000 familyid
 #
 # To run the backend and frontend as two separate containers instead (backend/Dockerfile and
 # frontend/Dockerfile), use:  docker compose -f docker-compose.two-services.yml up --build

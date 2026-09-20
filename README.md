@@ -206,8 +206,9 @@ FRONTEND_CONTRACT.md      component and page inventory for the frontend
 DESIGN.md                 design system brief (tokens, type, layout rules)
 DEMO_SCRIPT.md             a ten-minute walkthrough of the full story
 DEPLOY.md                   Render deployment guide
-Dockerfile                   single-service image: backend + built frontend, one port (Render default)
-docker-entrypoint.sh          entrypoint for that image (optional seeding, binds to $PORT)
+ARCHITECTURE.md              detailed architecture: components, data model, engines, flows, deployment
+Dockerfile                   single-service image: backend + built frontend (+ embedded Postgres), one port
+docker-entrypoint.sh          entrypoint for that image (embedded database, secret, seeding, $PORT)
 docker-compose.yml            runs the single-service image + Postgres locally
 docker-compose.two-services.yml  alternative: separate backend and frontend containers
 render.yaml                   Render Blueprint: one web service + managed Postgres
@@ -246,6 +247,7 @@ frontend/
 | [FRONTEND_CONTRACT.md](FRONTEND_CONTRACT.md) | component and page inventory |
 | [DESIGN.md](DESIGN.md) | design system brief |
 | [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | a ten-minute walkthrough of the full story |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | detailed architecture: components, data model, engines, flows, deployment |
 | [DEPLOY.md](DEPLOY.md) | Render deployment guide |
 | [backend/README.md](backend/README.md) | backend setup, environment variables, seed details |
 | [frontend/README.md](frontend/README.md) | frontend setup and structure |
@@ -282,18 +284,21 @@ frontend/
 
 ## 14. Deployment
 
-The default deployment is **one Render Web Service plus one managed Postgres database**. The root
-[`Dockerfile`](Dockerfile) builds the frontend and the backend serves it alongside the API from one
-process on one port, so there is no CORS to configure and no service URL to wire in afterwards. Test
-the exact image Render will build locally with:
+**Zero configuration:** push the repository, add it on Render as a Docker **Web Service**, set no
+environment variables. The root [`Dockerfile`](Dockerfile) produces one container that serves the
+API and the built frontend on one port and, when no `DATABASE_URL` is given, runs an embedded
+PostgreSQL and seeds the demo data itself. For data that must survive redeploys, apply the
+[`render.yaml`](render.yaml) blueprint instead: it adds a managed Postgres and wires it in, still
+with no prompts. Both paths, persistence trade-offs and every optional setting are in
+**[DEPLOY.md](DEPLOY.md)**.
+
+Try the exact image locally, either self-contained or with a separate Postgres:
 
 ```bash
-docker compose up --build
+docker build -t familyid . && docker run --rm -p 8000:8000 familyid   # embedded database
+docker compose up --build                                               # separate Postgres
 ```
 
-Then open [http://localhost:8000](http://localhost:8000) (API docs at `/docs`). To deploy, push the
-repository and either apply the [`render.yaml`](render.yaml) blueprint or create the two resources by
-hand and paste [`render.env`](render.env) into the service's environment — step by step in
-**[DEPLOY.md](DEPLOY.md)**. The same guide keeps a two-service layout
-([`backend/Dockerfile`](backend/Dockerfile) + [`frontend/Dockerfile`](frontend/Dockerfile)) as an
-alternative for when the API and the frontend must scale independently.
+Then open [http://localhost:8000](http://localhost:8000) (API docs at `/docs`). A two-service layout
+([`backend/Dockerfile`](backend/Dockerfile) + [`frontend/Dockerfile`](frontend/Dockerfile)) remains
+available for when the API and the frontend must scale independently.
