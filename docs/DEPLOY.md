@@ -1,6 +1,6 @@
 # Deploying to Render
 
-The image built from the root [`Dockerfile`](Dockerfile) is self-sufficient: one container serves
+The image built from the root [`Dockerfile`](../Dockerfile) is self-sufficient: one container serves
 the API and the built frontend on one port, and if no database is configured it runs an embedded
 PostgreSQL inside the container. There is nothing to configure to get a working deployment.
 
@@ -33,7 +33,7 @@ restart, which is right for a demo and wrong for real data.
 ## Option B — blueprint with managed Postgres
 
 For data that must survive deploys, let Render provision a managed database and hand its URL to the
-container. [`render.yaml`](render.yaml) describes both resources with every value fixed, generated or
+container. [`render.yaml`](../render.yaml) describes both resources with every value fixed, generated or
 wired, so there are still no prompts:
 
 1. Push the repository.
@@ -46,7 +46,7 @@ change `plan` in `render.yaml` for anything longer-lived.
 
 ## What happens on first boot
 
-[`docker-entrypoint.sh`](docker-entrypoint.sh), in order:
+[`docker-entrypoint.sh`](../docker-entrypoint.sh), in order:
 
 1. Starts as root only to take ownership of `/app/data` (a mounted disk is often root-owned), then
    re-executes itself as the unprivileged `appuser`.
@@ -80,7 +80,7 @@ container, which for Option A means a fresh, reseeded database.
 
 ## Optional settings
 
-Everything has a working default. [`render.env`](render.env) lists the overrides and can be pasted
+Everything has a working default. [`render.env`](../render.env) lists the overrides and can be pasted
 into the service's **Environment → Add from .env**:
 
 | Variable | Default | Set it when |
@@ -139,17 +139,17 @@ docker build -t familyid . && docker run --rm -p 8000:8000 familyid
 ## Option C — two separate services
 
 Kept for when the API and the frontend must scale or deploy independently. Uses
-[`backend/Dockerfile`](backend/Dockerfile) (API only; requires `DATABASE_URL`) and
-[`frontend/Dockerfile`](frontend/Dockerfile) (nginx serving the Vite build; its
+[`backend/Dockerfile`](../backend/Dockerfile) (API only; requires `DATABASE_URL`) and
+[`frontend/Dockerfile`](../frontend/Dockerfile) (nginx serving the Vite build; its
 `docker-entrypoint.sh` writes `env-config.js` from `API_URL` at container start). Two variables are
 circular on a first deploy because each service's URL exists only after it is created:
 
 1. Create the database (as in Option B, or manually).
 2. Backend Web Service: Dockerfile `backend/Dockerfile`, context `backend`, health check
-   `/api/health`; paste [`render-backend.env`](render-backend.env), fill `DATABASE_URL` and
+   `/api/health`; paste [`render-backend.env`](../deploy/two-services/render-backend.env), fill `DATABASE_URL` and
    `JWT_SECRET`. Deploy, copy its URL.
 3. Frontend Web Service: Dockerfile `frontend/Dockerfile`, context `frontend`; paste
-   [`render-frontend.env`](render-frontend.env) with `API_URL` = backend URL. Deploy, copy its URL.
+   [`render-frontend.env`](../deploy/two-services/render-frontend.env) with `API_URL` = backend URL. Deploy, copy its URL.
 4. On the backend set `CORS_ORIGINS` to the frontend URL and redeploy.
 
 Locally: `docker compose -f docker-compose.two-services.yml up --build`.

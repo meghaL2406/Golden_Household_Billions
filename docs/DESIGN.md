@@ -119,6 +119,16 @@ A fixed pattern, reused on every page:
   border, aligned left; user bubbles on `--blue-light` in `--blue`, aligned right. Page links
   returned with an answer render as pills with a small arrow. Nothing in the panel animates except
   the 0.18s fade on open.
+- **Assistant panel, live state (OpenRouter):** when a model is connected the "Coming soon" tag and
+  the "SOON" chip disappear and the info notice is replaced by a one-line 10px muted caption under
+  the heading: "Answers are based on your family record · model: <name>", with the model name in
+  mono. While a reply is generating, show a three-dot typing indicator in an assistant bubble (the
+  dots pulse in opacity only, 0.9s, no movement); stream text into the bubble as it arrives. Below
+  an answer, the records it used render as neutral 9px tags ("Eligibility · Child Benefit",
+  "Family profile") so the reader can see what the answer rests on; page links stay as pills. If the
+  model is unavailable the panel falls back to the preview state with a warning-tone notice, "The
+  assistant is answering from samples right now", never an error dialog. The assistant explains and
+  points; it never shows a control that grants, approves or changes anything.
 - **Empty states:** centred, a 30px icon in a soft tile, one `h2`, one sentence, and one primary button.
 - **Motion:** 0.18–0.22s ease transitions on hover, border and colour only. Nothing bounces.
 - **Spacing scale:** 4, 6, 8, 12, 16, 22, 32, 44px. Prefer air over dividers wherever both would work.

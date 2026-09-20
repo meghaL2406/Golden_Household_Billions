@@ -11,18 +11,19 @@ Cloudinary for documents (falls back to local storage) · mobile or email OTP lo
 
 1. [Problem statement](#1-problem-statement)
 2. [Our solution](#2-our-solution)
-3. [Use cases](#3-use-cases)
-4. [How it works](#4-how-it-works)
-5. [Architecture](#5-architecture)
-6. [Quick start](#6-quick-start)
-7. [Two portals](#7-two-portals)
-8. [Demo logins](#8-demo-logins-otp-is-123456-in-dev_mode)
-9. [Resetting demo data](#9-resetting-demo-data)
-10. [Project layout](#10-project-layout)
-11. [Documents](#11-documents)
-12. [Panel feedback addressed](#12-panel-feedback-addressed)
-13. [Troubleshooting](#13-troubleshooting)
-14. [Deployment](#14-deployment)
+3. [Impact](#3-impact)
+4. [Use cases](#4-use-cases)
+5. [How it works](#5-how-it-works)
+6. [Architecture](#6-architecture)
+7. [Quick start](#7-quick-start)
+8. [Two portals](#8-two-portals)
+9. [Demo logins (OTP is `123456` in DEV_MODE)](#9-demo-logins-otp-is-123456-in-dev_mode)
+10. [Resetting demo data](#10-resetting-demo-data)
+11. [Project layout](#11-project-layout)
+12. [Documents](#12-documents)
+13. [Panel feedback addressed](#13-panel-feedback-addressed)
+14. [Troubleshooting](#14-troubleshooting)
+15. [Deployment](#15-deployment)
 
 ## 1. Problem statement
 
@@ -58,7 +59,32 @@ profile, so a family sees what it qualifies for without filing anything twice, a
 from application through to the citizen confirming they actually received it — with a grievance opened
 automatically if they did not.
 
-## 3. Use cases
+## 3. Impact
+
+Gujarat's food security scheme alone covers 75 lakh families, 3.25 crore people, each of whom
+re-proves identity to every department separately today. Nationally, 5.2 crore fake or duplicate
+ration cards existed before biometric de-duplication caught them, and Direct Benefit Transfer's leak
+plugging has saved ₹3.48 lakh crore. Haryana's Family ID model already runs at 70 lakh families and
+2.6 crore residents. Ours adds what that model still lacks: benefits tracked all the way to citizen
+confirmed delivery, and duplicate identities caught at enrolment instead of years later in an audit.
+
+Sources: [Gujarat NFSA coverage](https://thefederal.com/states/west/gujarat/over-68-lakh-families-to-get-free-foodgrains-under-nfsa-again) ·
+[DBT savings, ₹3.48 lakh crore](https://www.business-standard.com/economy/news/dbt-saves-3-48-trillion-reshapes-india-s-welfare-delivery-system-125041701278_1.html) ·
+[Haryana Parivar Pehchan Patra](https://meraparivar.haryana.gov.in/)
+
+### Real problems it solves
+
+| Real-life problem | How Family ID solves it |
+|---|---|
+| A family proves its identity separately to every department, filing the same documents again for each scheme | One verified profile per household, reused automatically across every scheme |
+| No one can tell a family what it actually qualifies for; eligibility is worked out by hand, per application | An eligibility engine checks every scheme automatically and gives a plain reason for each result |
+| A ration or cash benefit is sanctioned but never confirmed as delivered, and there is no way to report it | Delivery is tracked through to the citizen confirming receipt, and a grievance opens automatically if it is reported missing |
+| The same person enrols twice under a spelling variant of their name or a second Aadhaar to draw a benefit twice | Enrolment is scored against name, date of birth, parent's name, mobile and Aadhaar, and a close match is held for an officer to decide |
+| A newborn or a person without Aadhaar cannot be added to a household record at all | A newborn can be added with just a birth certificate, and identity can be verified through other documents when Aadhaar is unavailable |
+| A birth, death, marriage or house move means updating records at multiple offices separately | Life events are reported once, verified by an officer, and every dependent record updates automatically |
+| Citizens without a smartphone or literacy struggle to self-enrol online | A service operator role completes the same enrolment on a citizen's behalf at a service centre |
+
+## 4. Use cases
 
 - **A new household enrols.** A citizen checks whether a record already exists for them, declares their
   household size up front, adds each member with a required Aadhaar number (a newborn is the one
@@ -80,11 +106,14 @@ automatically if they did not.
   duplicate cases, scheme-wise and district-wise eligibility, and a map view — without exposing personal
   details on the map.
 - **AI assistant (coming soon).** A floating assistant in both portals answers questions about
-  eligibility, documents, life events, benefits and grievances and links to the right page. It is a
-  preview: the API and the panel are in place, and answers come from fixed samples until a language
-  model is connected.
+  eligibility, documents, life events, benefits and grievances and links to the right page. The API
+  and the panel are in place and answers currently come from fixed samples. The planned model
+  provider is **OpenRouter**: the assistant will send the citizen's own eligibility results and scheme
+  rules as context to a configurable model through OpenRouter's OpenAI-compatible API, and stay in
+  preview mode whenever no `OPENROUTER_API_KEY` is configured. See
+  [ARCHITECTURE.md](docs/ARCHITECTURE.md#56-ai-assistant-openrouter).
 
-## 4. How it works
+## 5. How it works
 
 ```mermaid
 flowchart TD
@@ -105,7 +134,7 @@ flowchart TD
     E -.-> M
 ```
 
-## 5. Architecture
+## 6. Architecture
 
 ```mermaid
 flowchart LR
@@ -114,7 +143,7 @@ flowchart LR
     end
 
     subgraph "Frontend — React 18 + Vite + TypeScript"
-        FE[Static build<br/>served by nginx in Docker]
+        FE[Static build<br/>served by the backend (single service)]
     end
 
     subgraph "Backend — FastAPI + SQLAlchemy 2"
@@ -125,6 +154,7 @@ flowchart LR
     DB[(PostgreSQL 16<br/>+ optional PostGIS)]
     CLOUD[(Cloudinary<br/>document storage)]
     SMTP[SMTP<br/>email OTP, optional]
+    LLM[OpenRouter<br/>AI assistant model, planned]
 
     U -->|HTTPS| FE
     FE -->|REST + JWT, direct browser calls| BE
@@ -132,14 +162,15 @@ flowchart LR
     BE -->|SQLAlchemy| DB
     BE -->|document upload| CLOUD
     BE -->|OTP delivery| SMTP
+    BE -.->|grounded prompts, no Aadhaar| LLM
 ```
 
 Backend and frontend are two independent services with no server-side coupling: the browser calls the
 backend directly, and either side can be redeployed, rebuilt or moved without touching the other. See
-[Deployment](#14-deployment) for how this maps onto two Docker containers plus a managed Postgres
+[Deployment](#15-deployment) for how this ships as one container, optionally with a managed Postgres
 instance.
 
-## 6. Quick start
+## 7. Quick start
 
 Requires PostgreSQL 16 running locally, Python 3.12, Node 18+, and [uv](https://docs.astral.sh/uv/).
 
@@ -162,7 +193,7 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173) and sign in with any demo login below (OTP `123456`).
 
-## 7. Two portals
+## 8. Two portals
 
 - **Citizen portal** (`/`) — enrol a household, manage members and documents, check scheme eligibility,
   apply for benefits, track delivery status, and raise grievances.
@@ -174,7 +205,7 @@ Open [http://localhost:5173](http://localhost:5173) and sign in with any demo lo
 Which portal you land on after login is decided by your account's role — a citizen always lands on `/`,
 every other role lands on `/officer`.
 
-## 8. Demo logins (OTP is `123456` in DEV_MODE)
+## 9. Demo logins (OTP is `123456` in DEV_MODE)
 
 | # | Role | Identifier | Notes |
 |---|---|---|---|
@@ -188,7 +219,7 @@ every other role lands on `/officer`.
 The login page also has a **Create new citizen** option for a fresh, non-demo account: enter any new
 mobile number or email and a name, and it creates a citizen account on the spot.
 
-## 9. Resetting demo data
+## 10. Resetting demo data
 
 `backend/app/seed.py --reset` drops and rebuilds every table, then reloads the standard demo dataset.
 Run it whenever you want a clean state for a walkthrough:
@@ -202,23 +233,23 @@ grievance, including ones created through the app itself (such as a new citizen 
 login page). Anything you want to keep should be noted down first; there is no undo. Without `--reset`,
 the script only seeds an empty database and otherwise does nothing, so it is safe to run at any time.
 
-## 10. Project layout
+## 11. Project layout
 
 ```
-API_CONTRACT.md          every backend endpoint and payload shape
-FRONTEND_CONTRACT.md      component and page inventory for the frontend
-DESIGN.md                 design system brief (tokens, type, layout rules)
-DEMO_SCRIPT.md             a ten-minute walkthrough of the full story
-DEPLOY.md                   Render deployment guide
-ARCHITECTURE.md              detailed architecture: components, data model, engines, flows, deployment
+docs/API_CONTRACT.md          every backend endpoint and payload shape
+docs/FRONTEND_CONTRACT.md      component and page inventory for the frontend
+docs/DESIGN.md                 design system brief (tokens, type, layout rules)
+docs/DEMO_SCRIPT.md             a ten-minute walkthrough of the full story
+docs/DEPLOY.md                   Render deployment guide
+docs/ARCHITECTURE.md              detailed architecture: components, data model, engines, flows, deployment
 Dockerfile                   single-service image: backend + built frontend (+ embedded Postgres), one port
 docker-entrypoint.sh          entrypoint for that image (embedded database, secret, seeding, $PORT)
 docker-compose.yml            runs the single-service image + Postgres locally
 docker-compose.two-services.yml  alternative: separate backend and frontend containers
 render.yaml                   Render Blueprint: one web service + managed Postgres
 render.env                    its environment variables, importable via Render's "Add from .env"
-render-backend.env            two-service alternative: backend variables
-render-frontend.env           two-service alternative: frontend variable
+deploy/two-services/render-backend.env            two-service alternative: backend variables
+deploy/two-services/render-frontend.env           two-service alternative: frontend variable
 
 backend/
   app/main.py              FastAPI app, router registration, static /uploads mount
@@ -243,20 +274,20 @@ frontend/
   README.md                    frontend setup and structure
 ```
 
-## 11. Documents
+## 12. Documents
 
 | Document | Covers |
 |---|---|
-| [API_CONTRACT.md](API_CONTRACT.md) | every endpoint and payload |
-| [FRONTEND_CONTRACT.md](FRONTEND_CONTRACT.md) | component and page inventory |
-| [DESIGN.md](DESIGN.md) | design system brief |
-| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | a ten-minute walkthrough of the full story |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | detailed architecture: components, data model, engines, flows, deployment |
-| [DEPLOY.md](DEPLOY.md) | Render deployment guide |
+| [API_CONTRACT.md](docs/API_CONTRACT.md) | every endpoint and payload |
+| [FRONTEND_CONTRACT.md](docs/FRONTEND_CONTRACT.md) | component and page inventory |
+| [DESIGN.md](docs/DESIGN.md) | design system brief |
+| [DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | a ten-minute walkthrough of the full story |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | detailed architecture: components, data model, engines, flows, deployment |
+| [DEPLOY.md](docs/DEPLOY.md) | Render deployment guide |
 | [backend/README.md](backend/README.md) | backend setup, environment variables, seed details |
 | [frontend/README.md](frontend/README.md) | frontend setup and structure |
 
-## 12. Panel feedback addressed
+## 13. Panel feedback addressed
 
 1. **Full benefit status chain:** Eligible → Applied → Under review → Approved → Sanctioned →
    Disbursed → Delivered → Received, with citizen confirmation of receipt.
@@ -271,7 +302,7 @@ frontend/
 5. **Login by mobile or email OTP**, with SMTP credentials pluggable for real email delivery, plus an
    explicit "create a new citizen account" path from the login screen.
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 1. **`createdb: database creation failed`** — PostgreSQL is not running, or a database named `familyid`
    already exists. Check with `pg_isready` and `psql -l`.
@@ -283,10 +314,10 @@ frontend/
 4. **PostGIS-related warnings at startup** — PostGIS is optional; the app falls back to plain latitude
    and longitude columns and works without it.
 5. **A page looks empty after signing in** — the demo data may have been reset since you last used it
-   (see [Resetting demo data](#9-resetting-demo-data)); sign in again with a current demo login, or
+   (see [Resetting demo data](#10-resetting-demo-data)); sign in again with a current demo login, or
    re-create what you need.
 
-## 14. Deployment
+## 15. Deployment
 
 **Zero configuration:** push the repository, add it on Render as a Docker **Web Service**, set no
 environment variables. The root [`Dockerfile`](Dockerfile) produces one container that serves the
@@ -294,7 +325,7 @@ API and the built frontend on one port and, when no `DATABASE_URL` is given, run
 PostgreSQL and seeds the demo data itself. For data that must survive redeploys, apply the
 [`render.yaml`](render.yaml) blueprint instead: it adds a managed Postgres and wires it in, still
 with no prompts. Both paths, persistence trade-offs and every optional setting are in
-**[DEPLOY.md](DEPLOY.md)**.
+**[DEPLOY.md](docs/DEPLOY.md)**.
 
 Try the exact image locally, either self-contained or with a separate Postgres:
 

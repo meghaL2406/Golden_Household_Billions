@@ -1,7 +1,7 @@
 # Family ID Platform — Backend
 
 FastAPI + SQLAlchemy 2.0 (sync) + PostgreSQL. The full endpoint reference lives in
-[`../API_CONTRACT.md`](../API_CONTRACT.md); the interactive OpenAPI docs are served at
+[`../docs/API_CONTRACT.md`](../docs/API_CONTRACT.md); the interactive OpenAPI docs are served at
 `http://localhost:8000/docs` once the server is running.
 
 ## 1. Prerequisites

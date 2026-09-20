@@ -35,6 +35,7 @@ flowchart LR
     civil[Civil registration<br/>mock source]
     cloud[(Cloudinary<br/>documents)]
     smtp[SMTP<br/>email OTP]
+    llm[OpenRouter<br/>AI assistant model — planned]
 
     citizen --> fe
     officer --> fe
@@ -45,6 +46,7 @@ flowchart LR
     api -. lookup .-> civil
     api -. upload .-> cloud
     api -. optional .-> smtp
+    api -. grounded prompt, masked data .-> llm
 ```
 
 The platform owns exactly one thing: the **unified family profile** and everything derived from it
@@ -147,7 +149,7 @@ of which executes the lifespan.
 | `app/routers/grievances.py` | Grievance lifecycle with escalation, resolution, rating |
 | `app/routers/dashboard.py` | Summary counts, district/scheme/application/benefit/case reports, map endpoints |
 | `app/routers/admin.py` | Audit log query, user management, enum metadata |
-| `app/routers/assistant.py` | AI assistant, **mock**: `/assistant/status` and `/assistant/chat` with fixed, role-aware sample answers and page links; the contract is final, the answer generator is the placeholder |
+| `app/routers/assistant.py` | AI assistant: `/assistant/status` and `/assistant/chat`. Currently **mock** (fixed, role-aware sample answers with page links); the contract is final and the answer generator is the placeholder for the OpenRouter integration described in §5.6 |
 | `app/main.py` (`/api/ping`) | Unauthenticated, database-free keep-alive target for external monitors (GET and HEAD) |
 | `app/services/eligibility.py` | Rule evaluation and family-wide recalculation |
 | `app/services/duplicates.py` | Duplicate person/family scoring, case opening, automatic checks |
@@ -294,6 +296,59 @@ of birth and gender (`MATCHED ≥ 90 %`, `PARTIAL ≥ 60 %`, else `MISMATCH`). M
 `AADHAAR_MISMATCH` case and the side-by-side comparison in the officer console. `search_existing`
 powers the first enrolment step: is this person already in a family, and is there a Ration/PDS
 household to seed members from?
+
+### 5.6 AI assistant (OpenRouter)
+
+**Status:** the endpoints and the panel ship today; answers come from `_mock_reply`. The design below
+is what replaces it, with **OpenRouter** as the model provider. OpenRouter exposes one
+OpenAI-compatible chat-completions API in front of many models, so the model is a configuration
+value rather than a code change.
+
+```mermaid
+sequenceDiagram
+    participant U as Citizen / Officer (panel)
+    participant A as /api/assistant/chat
+    participant R as Retrieval (own DB)
+    participant O as OpenRouter
+    U->>A: message (JWT)
+    A->>R: family profile, eligibility rows + reasons, open cases, benefits, scheme rules
+    R-->>A: grounding context (Aadhaar masked, no other members' contact data)
+    A->>O: POST /api/v1/chat/completions {model, system + context + question}
+    O-->>A: answer (streamed or whole)
+    A->>A: validate: only link to known routes, strip anything not in context
+    A-->>U: reply, links[], sources[], model
+```
+
+Design points:
+
+- **Grounding first.** The assistant never answers from the model's general knowledge about
+  schemes. Retrieval reuses existing code: `family_detail`, the caller's `scheme_eligibility` rows
+  (already carrying plain-English reasons), open verification cases, benefit and grievance status,
+  and the active schemes' rules and required documents. Officers additionally get aggregate report
+  data, never another family's full profile unless they have opened it.
+- **Role and scope.** The same `load_family`/`my_family` guards apply: a citizen's context is only
+  their own family. The model is told the caller's role and told to defer to the officer process for
+  decisions (it explains eligibility; it does not grant it).
+- **Data minimisation towards the provider.** Aadhaar is already stored hashed and is sent as
+  "linked / not linked" only; mobile numbers, emails and document files are not sent; names are
+  limited to the caller's household. OpenRouter is configured with `data_collection: deny` in the
+  request's provider preferences so prompts are not retained or used for training.
+- **Provider and model as configuration.** `OPENROUTER_API_KEY` enables the integration;
+  `OPENROUTER_MODEL` selects the model (a small, fast instruction model by default, for example a
+  Llama or Gemma class model, with the option of a frontier model for officers); `OPENROUTER_BASE_URL`
+  defaults to `https://openrouter.ai/api/v1`. The HTTP headers `HTTP-Referer` and `X-Title` identify
+  the app to OpenRouter. With no key set, `/assistant/status` keeps reporting `available: false,
+  mode: "mock"` and the panel shows "Coming soon" — the current behaviour.
+- **Output handling.** Replies are post-processed: page links are kept only if they match known
+  frontend routes; the model is asked for a short answer plus an optional list of source records,
+  which the API returns as `sources[]` so the panel can show what the answer was based on. A per-user
+  rate limit and a token budget per request bound cost; failures fall back to the mock reply with a
+  notice rather than an error.
+- **Audit.** Each exchange writes an `ASSISTANT_QUERY` audit row (who, when, model, token counts,
+  whether the fallback was used) — not the message text, which stays out of the audit log by design.
+- **Evaluation before "live".** A fixed set of citizen and officer questions with expected grounded
+  answers runs against the model on each change to the prompt or model; `available` flips to `true`
+  only when it passes.
 
 ## 6. Key flows
 
@@ -461,6 +516,7 @@ All settings are read by `app/core/config.py` from environment variables or `bac
 | `CLOUDINARY_*` | Enables Cloudinary storage when all three are set |
 | `SMTP_*` | Enables email OTP when host, user and password are set |
 | `PORT`, `WEB_CONCURRENCY` | Listen port and uvicorn workers (container entrypoint) |
+| `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_BASE_URL` | Planned (§5.6): enable the AI assistant through OpenRouter; absent ⇒ assistant stays in preview/mock mode |
 | `SEED_ON_BOOT`, `SEED_RESET` | Load demo data on boot; `SEED_RESET` drops all tables first |
 
 Frontend: `VITE_API_URL` at build time, or `API_URL` at runtime for the two-service image.
@@ -481,15 +537,20 @@ Frontend: `VITE_API_URL` at build time, or `API_URL` at runtime for the two-serv
   in `API_CONTRACT.md` rather than enforced by the database.
 - **Mocked government sources.** Keeps the demo self-contained; the `ExternalRecord` snapshot model
   is what a real integration would populate.
+- **OpenRouter rather than a single model vendor.** One API and one key cover many models, so the
+  model can be changed per role or per cost target without code changes, and a provider outage can
+  be routed around. Cost: an extra hop and a third party in the data path, addressed by strict
+  grounding, data minimisation and the no-retention provider preference (§5.6).
 - **One SPA for both portals.** Shared design system and auth; route trees and layouts are separate,
   so they could be split into two builds later.
 
 ## 12. Extension points
 
-- **AI assistant**: replace `_mock_reply` in `app/routers/assistant.py` with a language-model call.
-  The natural context is the caller's family profile (`family_detail`), their `scheme_eligibility`
-  rows with reasons, and the scheme rules; keep answers grounded in those records and return page
-  links in the existing `links` shape. Flip `available` to `true` in `/assistant/status` when live.
+- **AI assistant**: implement §5.6 — an `app/services/assistant.py` with a retrieval step and an
+  OpenRouter client (`POST {OPENROUTER_BASE_URL}/chat/completions`, bearer `OPENROUTER_API_KEY`,
+  model `OPENROUTER_MODEL`), then have `chat()` in `app/routers/assistant.py` call it and fall back
+  to `_mock_reply` on any failure. Keep the response shape (`reply`, `links`, plus `sources` and
+  `model`) and flip `available` in `/assistant/status` when the evaluation set passes.
 - **Real source integrations**: implement a client in `app/services/external.py` returning the
   same payload keys (`name`, `date_of_birth`, `gender`, `father_name`, …); nothing downstream changes.
 - **SMS OTP**: add a sender in `app/services/otp.py` next to `send_email`.
