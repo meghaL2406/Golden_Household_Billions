@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 
 from app.core.config import settings
-from app.core.database import Base, engine, init_extensions
+from app.core.database import run_startup_migrations
 from app.services.storage import UPLOAD_DIR
 from app.models import *  # noqa: F401,F403  (register models)
 
@@ -18,8 +18,7 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_extensions()
-    Base.metadata.create_all(bind=engine)
+    run_startup_migrations()
     yield
 
 
