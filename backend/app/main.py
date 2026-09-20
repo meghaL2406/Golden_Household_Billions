@@ -1,10 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 
@@ -57,3 +58,26 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 @app.get("/api/health")
 def health():
     return {"status": "ok", "cloudinary": settings.cloudinary_enabled, "smtp": settings.smtp_enabled, "dev_mode": settings.DEV_MODE}
+
+
+# ---------------------------------------------------------------------------- single-service deploy
+# When the frontend's production build has been copied to backend/web (see the root Dockerfile), this
+# process serves it directly — one Render service, one origin, no CORS to configure. In local
+# development backend/web does not exist, so none of this registers and the frontend keeps running on
+# its own dev server (port 5173) exactly as before. Registered last: /api/* and /uploads/* above are
+# matched first regardless, since Starlette resolves routes in registration order.
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
+if WEB_DIR.is_dir():
+    logging.getLogger("familyid").info("Serving the built frontend from %s", WEB_DIR)
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_frontend(full_path: str):
+        candidate = (WEB_DIR / full_path).resolve()
+        # Guard against path traversal escaping WEB_DIR before trusting `candidate.is_file()`.
+        if candidate.is_file() and WEB_DIR in candidate.parents:
+            headers = {"Cache-Control": "public, max-age=31536000, immutable"} if full_path.startswith("assets/") else {}
+            return FileResponse(candidate, headers=headers)
+        # Anything else (an unbuilt asset, or a client-side route like /family or /officer/cases/123)
+        # falls back to index.html so React Router can take over; it is never cached.
+        return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})

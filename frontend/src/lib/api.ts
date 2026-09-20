@@ -4,13 +4,25 @@ declare global {
   }
 }
 
-// Resolution order: runtime config injected by the Docker container at start-up (public/env-config.js,
-// written by docker-entrypoint.sh) → the value baked in at build time by Vite → the local dev default.
-// The runtime path lets one built Docker image be pointed at any backend without a rebuild.
-export const API_URL: string =
-  (typeof window !== "undefined" && window.__ENV__?.VITE_API_URL) ||
-  (import.meta.env.VITE_API_URL as string | undefined) ||
-  "http://localhost:8000";
+// Resolution order:
+//   1. Runtime config injected by the Docker container at start-up (public/env-config.js, written by
+//      frontend/docker-entrypoint.sh) — only used by the two-separate-services deploy, where the
+//      frontend needs to be told the backend's URL after the fact. An *empty string* here is a
+//      deliberate, explicit value (not "unset"): it means same-origin — see point 3.
+//   2. The value baked in at build time by Vite (frontend/.env, or frontend/.env.production written by
+//      the root Dockerfile for the single-service build).
+//   3. The local dev default. In the single-service Docker image the frontend is served BY the backend
+//      on the same origin, so its build sets VITE_API_URL="" and every request below is a same-origin
+//      relative path — no CORS involved at all, unlike the two-service deploy.
+function resolveApiUrl(): string {
+  if (typeof window !== "undefined" && window.__ENV__ && "VITE_API_URL" in window.__ENV__) {
+    return window.__ENV__.VITE_API_URL ?? "";
+  }
+  const buildTime = import.meta.env.VITE_API_URL as string | undefined;
+  return buildTime !== undefined ? buildTime : "http://localhost:8000";
+}
+
+export const API_URL: string = resolveApiUrl();
 
 export const AUTH_STORAGE_KEY = "familyid.auth";
 
@@ -25,11 +37,12 @@ export class ApiError extends Error {
   }
 }
 
-/** Absolute URL for a possibly relative file_url returned by the API. */
+/** Absolute (or, same-origin, root-relative) URL for a possibly relative file_url returned by the API. */
 export function apiUrl(path: string): string {
   if (!path) return path;
   if (/^https?:\/\//i.test(path)) return path;
-  return `${API_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+  const rel = path.startsWith("/") ? path : `/${path}`;
+  return API_URL ? `${API_URL}${rel}` : rel;
 }
 
 export function readStoredToken(): string | null {
@@ -70,7 +83,10 @@ export type ApiInit = {
 };
 
 export async function api<T = any>(path: string, init: ApiInit = {}): Promise<T> {
-  const url = new URL(`${API_URL}/api${path.startsWith("/") ? "" : "/"}${path}`);
+  const rel = `/api${path.startsWith("/") ? "" : "/"}${path}`;
+  // A relative `rel` needs a base to become a URL object; window.location.origin is exactly right
+  // for a same-origin, single-service deploy, and is otherwise simply discarded once API_URL is absolute.
+  const url = new URL(API_URL ? `${API_URL}${rel}` : rel, typeof window !== "undefined" ? window.location.origin : undefined);
   if (init.params) {
     for (const [key, value] of Object.entries(init.params)) {
       if (value === undefined || value === null || value === "") continue;

@@ -1,7 +1,9 @@
-# Local Docker network that mirrors the production topology (separate backend/frontend/database
-# services talking over HTTP), useful for testing the two Dockerfiles before deploying them.
-# Run: docker compose up --build
-# Frontend: http://localhost:8080   Backend: http://localhost:8000/docs
+# Local run of the production image: the single-service container (root Dockerfile) plus Postgres.
+# This is the same image Render builds, so what works here works there.
+#   docker compose up --build         →  http://localhost:8000  (API docs at /docs)
+#
+# To run the backend and frontend as two separate containers instead (backend/Dockerfile and
+# frontend/Dockerfile), use:  docker compose -f docker-compose.two-services.yml up --build
 
 services:
   db:
@@ -21,9 +23,9 @@ services:
     ports:
       - "5432:5432"
 
-  backend:
+  app:
     build:
-      context: ./backend
+      context: .
     restart: unless-stopped
     depends_on:
       db:
@@ -33,27 +35,12 @@ services:
       JWT_SECRET: dev-only-secret-change-me
       DEV_MODE: "true"
       DEMO_OTP: "123456"
-      CORS_ORIGINS: http://localhost:8080,http://localhost:5173
       SEED_ON_BOOT: "true"
       PORT: "8000"
     volumes:
       - familyid_uploads:/app/uploads
     ports:
       - "8000:8000"
-
-  frontend:
-    build:
-      context: ./frontend
-    restart: unless-stopped
-    depends_on:
-      - backend
-    environment:
-      # The browser calls this URL directly, so it must be reachable from the host machine —
-      # the frontend container itself never talks to `backend` over the compose network.
-      API_URL: http://localhost:8000
-      PORT: "8080"
-    ports:
-      - "8080:8080"
 
 volumes:
   familyid_db_data:

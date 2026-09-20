@@ -1,127 +1,105 @@
 # Deploying to Render
 
-Two Docker-based web services (backend, frontend) plus a managed Postgres database. Either use the
-`render.yaml` blueprint for a mostly one-click setup, or create the three resources by hand — both are
-covered below. Read [Networking notes](#networking-notes) either way; it explains the two environment
-variables that cannot be filled in until both services exist.
+The recommended layout is **one Web Service plus one managed Postgres database**. The root
+[`Dockerfile`](Dockerfile) builds the React frontend and copies it into the FastAPI image, and the
+backend serves both the API and the built frontend from one process on one port. Because everything is
+on one origin there is no CORS to configure and no service URL to wire in after the fact.
 
-## Option A — Blueprint (`render.yaml`)
+An alternative two-service layout (separate backend and frontend containers) is kept in
+[Option B](#option-b--two-separate-services) for when the two need to scale independently.
+
+## Option A — single service (recommended)
+
+### A1. Blueprint (`render.yaml`), one click
 
 1. Push this repository to GitHub or GitLab.
-2. In the Render dashboard: **New → Blueprint**, point it at the repository. Render reads
-   [`render.yaml`](render.yaml) and proposes a Postgres database, `familyid-backend` and
-   `familyid-frontend`.
-3. Apply it. The first deploy will succeed for the backend (it only needs `DATABASE_URL`, which
-   Render fills in automatically from the database) but the frontend will come up without a working
-   `API_URL`, and the backend will reject the frontend's requests until `CORS_ORIGINS` is set — see
-   [Networking notes](#networking-notes) to finish the wiring.
+2. Render dashboard: **New → Blueprint**, pick the repository. Render reads
+   [`render.yaml`](render.yaml) and proposes the `familyid-db` database and the `familyid` web
+   service.
+3. Apply. `DATABASE_URL` is filled in from the database and `JWT_SECRET` is generated for you; every
+   other variable already has a working default. The first boot loads the demo dataset
+   (`SEED_ON_BOOT=true`); set it back to `false` afterwards.
+4. Open the service URL (`https://familyid-xxxx.onrender.com`) and sign in with a demo login
+   (OTP `123456`).
 
-## Option B — Manual setup
+### A2. Manual setup, no blueprint
 
-### 1. Database
+1. **Database.** **New → PostgreSQL**, name `familyid-db`. Once provisioned, copy its **Internal
+   Database URL** (same region, no egress cost; not the external one).
+2. **Web Service.** **New → Web Service → Build and deploy from a Git repository**, same repo.
 
-**New → PostgreSQL.** Name it `familyid-db`, note the **Internal Database URL** once it is
-provisioned — the backend should use the internal URL (same-region traffic, no extra cost or
-latency), not the external one.
+   | Setting | Value |
+   |---|---|
+   | Runtime | Docker |
+   | Dockerfile path | `Dockerfile` |
+   | Docker build context directory | `.` (repository root) |
+   | Health check path | `/api/health` |
 
-### 2. Backend service
+3. **Environment.** Environment tab → **Add Environment Variable → Add from .env**, paste
+   [`render.env`](render.env), and replace its two `REPLACE_ME` values: `DATABASE_URL` (from step 1)
+   and `JWT_SECRET` (any long random string). See [`backend/README.md`](backend/README.md) for what
+   each variable does.
+4. **Deploy.** The first boot creates the tables and, with `SEED_ON_BOOT=true`, loads the demo
+   dataset. Set `SEED_ON_BOOT` back to `false` once you have signed in.
 
-**New → Web Service → Build and deploy from a Git repository.**
-
-| Setting | Value |
-|---|---|
-| Runtime | Docker |
-| Dockerfile path | `backend/Dockerfile` |
-| Docker build context directory | `backend` |
-| Health check path | `/api/health` |
-
-Environment variables — the fastest way is **Environment tab → Add Environment Variable → Add from
-.env**, and paste in [`render-backend.env`](render-backend.env). Fix its three `REPLACE_ME` values
-first: `DATABASE_URL` (the database's Internal Database URL from step 1), `JWT_SECRET` (any long random
-string), and `CORS_ORIGINS` (leave as a placeholder for now — it needs the frontend's URL from step 4,
-which does not exist yet). Everything else in that file already has a working default; see
-[`backend/README.md`](backend/README.md) for what each one does.
-
-Deploy. Once it is live, copy its public URL (`https://familyid-backend-xxxx.onrender.com`).
-
-### 3. Frontend service
-
-**New → Web Service → Build and deploy from a Git repository**, same repo.
-
-| Setting | Value |
-|---|---|
-| Runtime | Docker |
-| Dockerfile path | `frontend/Dockerfile` |
-| Docker build context directory | `frontend` |
-
-Environment variable — paste [`render-frontend.env`](render-frontend.env) via **Add from .env** and
-replace its one placeholder:
-
-| Key | Value |
-|---|---|
-| `API_URL` | the backend URL from step 2, e.g. `https://familyid-backend-xxxx.onrender.com` |
-
-Deploy. Copy its public URL too (`https://familyid-frontend-xxxx.onrender.com`).
-
-### 4. Close the loop: CORS
-
-Go back to the **backend** service, set `CORS_ORIGINS` to the frontend's URL from step 3 (comma-separate
-more than one origin, e.g. a custom domain as well), and redeploy. Until this is set, the browser will
-show CORS errors and no request will succeed even though both services are individually healthy.
-
-## Networking notes
-
-- **Why two variables can't be pre-filled:** Render assigns each service's `*.onrender.com` hostname
-  only after it is first created, so `CORS_ORIGINS` (backend needs the frontend's URL) and `API_URL`
-  (frontend needs the backend's URL) are circular on a first deploy. Fill them in once, after both
-  services exist — see step 4 above. Every deploy after that is automatic.
-- **How the frontend finds the API:** the browser calls the backend directly — the frontend is a static
-  build served by nginx, with **no server-side proxy** to the backend. `API_URL` is written into
-  `env-config.js` by [`frontend/docker-entrypoint.sh`](frontend/docker-entrypoint.sh) when the container
-  starts, and read at runtime by [`frontend/src/lib/api.ts`](frontend/src/lib/api.ts). This means the
-  same built Docker image works in any environment — change `API_URL` and restart, no rebuild needed.
-- **Port binding:** Render assigns the container's listen port via the `PORT` environment variable at
-  run time (not necessarily 8000/8080). Both Dockerfiles already honour this — the backend's
-  `docker-entrypoint.sh` passes `--port "$PORT"` to uvicorn, and the frontend's nginx config is
-  templated with `${PORT}` and rendered at container start.
-- **Database URL scheme:** Render (and most managed Postgres providers) hand out a `postgres://` or
-  `postgresql://` connection string. `backend/app/core/config.py` normalises this to the
-  `postgresql+psycopg://` scheme SQLAlchemy needs automatically — no manual edit required.
-- **PostGIS:** the backend tries to enable the `postgis` extension at start-up but does not require it
-  (`app/core/database.py: init_extensions`); Render's managed Postgres may not offer it, and the app
-  falls back to plain latitude/longitude columns on the map without any code change.
-
-## Uploaded documents and the ephemeral filesystem
-
-Render's Docker services use an ephemeral filesystem: anything written locally (including
-`backend/uploads/` when Cloudinary is not configured) is lost on every redeploy or restart. For a real
-deployment, set the three `CLOUDINARY_*` environment variables on the backend so documents are stored
-durably instead. For a short-lived demo, local storage is fine as-is.
-
-## Loading demo data
-
-Set `SEED_ON_BOOT=true` on the backend service and redeploy to load the standard demo dataset once,
-the first time the database is empty (see [`backend/app/seed.py`](backend/app/seed.py)). Turn it back
-off afterwards — leaving it on has no effect on a non-empty database, but it is not something to leave
-set indefinitely. **Never** set `SEED_RESET=true` on a deployment with real data: it drops every table
-first. To reset a deployed database deliberately, use Render's **Shell** tab on the backend service and
-run `python -m app.seed --reset` by hand.
-
-## Local Docker testing
-
-Before pushing to Render, the same two Dockerfiles can be exercised together locally:
+### Test the same image locally first
 
 ```bash
 docker compose up --build
 ```
 
-This starts Postgres, the backend and the frontend on one Docker network (see
-[`docker-compose.yml`](docker-compose.yml)), seeded automatically, at http://localhost:8080 (frontend)
-and http://localhost:8000/docs (backend).
+That starts Postgres and the single-service container from [`docker-compose.yml`](docker-compose.yml)
+at http://localhost:8000 (API docs at `/docs`) — the same image Render builds.
 
-## Alternative: frontend as a Render Static Site
+## How the single service works
 
-The frontend Dockerfile is provided because it was asked for, but a plain **Static Site** (build command
-`npm run build`, publish directory `dist`) is a simpler and cheaper option on Render for a build with no
-server-side logic. In that case, set the `VITE_API_URL` build-time environment variable instead of the
-Docker image's runtime `API_URL` — Vite bakes it into the bundle, so a URL change requires a rebuild.
+- **Routing.** `/api/*` is the REST API and `/uploads/*` serves locally stored documents; every other
+  path is served from the frontend build. Unknown paths return `index.html` so client-side routes
+  such as `/family` or `/officer/cases/123` work on refresh (`backend/app/main.py`, `serve_frontend`).
+  In local development `backend/web` does not exist, so this is inactive and the frontend keeps
+  running on its own dev server.
+- **API URL.** The frontend is built with `VITE_API_URL=""` (root Dockerfile), which
+  `frontend/src/lib/api.ts` treats as "same origin as the page". No runtime injection is needed.
+- **Port.** Render assigns the listen port via `PORT`; [`docker-entrypoint.sh`](docker-entrypoint.sh)
+  passes it to uvicorn.
+- **Database URL scheme.** Render hands out a `postgres://` URL; `backend/app/core/config.py`
+  rewrites it to the `postgresql+psycopg://` scheme SQLAlchemy needs.
+- **Startup.** Tables and extensions are created on boot under a Postgres advisory lock, so
+  several uvicorn workers starting at once do not race (`app/core/database.py`). PostGIS is attempted
+  in its own transaction and skipped if the server lacks it; the map falls back to plain coordinates.
+
+## Uploaded documents and the ephemeral filesystem
+
+Render's Docker services have an ephemeral filesystem: anything written locally, including
+`uploads/` when Cloudinary is not configured, is lost on every redeploy or restart. For a real
+deployment set the three `CLOUDINARY_*` variables so documents are stored durably. For a short-lived
+demo, local storage is fine.
+
+## Loading and resetting demo data
+
+`SEED_ON_BOOT=true` loads the standard demo dataset the first time the database is empty and does
+nothing once users exist. **Never** set `SEED_RESET=true` on a deployment with real data: it drops
+every table first. To reset a deployed database deliberately, open the service's **Shell** tab and run
+`python -m app.seed --reset` by hand.
+
+## Option B — two separate services
+
+Use this only if the API and the frontend must scale or deploy independently. It needs two extra
+environment variables that are circular on a first deploy, because Render assigns each service's
+`*.onrender.com` hostname only after it is created.
+
+1. **Database** as in A2 step 1.
+2. **Backend Web Service**: Docker, Dockerfile path `backend/Dockerfile`, build context `backend`,
+   health check `/api/health`. Paste [`render-backend.env`](render-backend.env) via **Add from .env**
+   and fill in `DATABASE_URL` and `JWT_SECRET`; leave `CORS_ORIGINS` for step 4. Deploy and copy its
+   URL.
+3. **Frontend Web Service**: Docker, Dockerfile path `frontend/Dockerfile`, build context `frontend`.
+   Paste [`render-frontend.env`](render-frontend.env) and set `API_URL` to the backend URL. Deploy
+   and copy its URL. The image is nginx serving the Vite build; `frontend/docker-entrypoint.sh` writes
+   `env-config.js` from `API_URL` at container start, so the same image can point at any backend.
+4. **Close the loop.** On the backend set `CORS_ORIGINS` to the frontend URL (comma-separate more
+   than one) and redeploy. Until then the browser shows CORS errors even though both services are
+   healthy.
+
+Locally: `docker compose -f docker-compose.two-services.yml up --build` (frontend on
+http://localhost:8080, backend on http://localhost:8000).

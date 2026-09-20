@@ -206,10 +206,14 @@ FRONTEND_CONTRACT.md      component and page inventory for the frontend
 DESIGN.md                 design system brief (tokens, type, layout rules)
 DEMO_SCRIPT.md             a ten-minute walkthrough of the full story
 DEPLOY.md                   Render deployment guide
-docker-compose.yml           local Docker network mirroring the production topology
-render.yaml                  Render Blueprint (backend + frontend + managed Postgres)
-render-backend.env           backend environment variables, importable via Render's "Add from .env"
-render-frontend.env          frontend environment variable, importable the same way
+Dockerfile                   single-service image: backend + built frontend, one port (Render default)
+docker-entrypoint.sh          entrypoint for that image (optional seeding, binds to $PORT)
+docker-compose.yml            runs the single-service image + Postgres locally
+docker-compose.two-services.yml  alternative: separate backend and frontend containers
+render.yaml                   Render Blueprint: one web service + managed Postgres
+render.env                    its environment variables, importable via Render's "Add from .env"
+render-backend.env            two-service alternative: backend variables
+render-frontend.env           two-service alternative: frontend variable
 
 backend/
   app/main.py              FastAPI app, router registration, static /uploads mount
@@ -278,17 +282,18 @@ frontend/
 
 ## 14. Deployment
 
-Both services are containerized: [`backend/Dockerfile`](backend/Dockerfile) (FastAPI, served by
-uvicorn) and [`frontend/Dockerfile`](frontend/Dockerfile) (a Vite build served by nginx, with the API
-URL injected at container start rather than baked into the build — see
-[`frontend/docker-entrypoint.sh`](frontend/docker-entrypoint.sh)). Test the whole stack locally with:
+The default deployment is **one Render Web Service plus one managed Postgres database**. The root
+[`Dockerfile`](Dockerfile) builds the frontend and the backend serves it alongside the API from one
+process on one port, so there is no CORS to configure and no service URL to wire in afterwards. Test
+the exact image Render will build locally with:
 
 ```bash
 docker compose up --build
 ```
 
-Frontend at [http://localhost:8080](http://localhost:8080), backend at
-[http://localhost:8000/docs](http://localhost:8000/docs), wired together exactly as they would be in
-production. For a full Render deployment walkthrough — the managed Postgres database, both Docker web
-services, the `render.yaml` blueprint, and the two environment variables that can only be filled in once
-both services exist — see **[DEPLOY.md](DEPLOY.md)**.
+Then open [http://localhost:8000](http://localhost:8000) (API docs at `/docs`). To deploy, push the
+repository and either apply the [`render.yaml`](render.yaml) blueprint or create the two resources by
+hand and paste [`render.env`](render.env) into the service's environment — step by step in
+**[DEPLOY.md](DEPLOY.md)**. The same guide keeps a two-service layout
+([`backend/Dockerfile`](backend/Dockerfile) + [`frontend/Dockerfile`](frontend/Dockerfile)) as an
+alternative for when the API and the frontend must scale independently.

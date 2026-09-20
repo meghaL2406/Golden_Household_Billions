@@ -1,6 +1,7 @@
-# Render Blueprint — a best-effort starting point for a one-click deploy.
-# Review it in the Render dashboard before applying; some values (CORS_ORIGINS, API_URL) can only
-# be filled in after both services exist and their *.onrender.com URLs are known (see DEPLOY.md).
+# Render Blueprint — one Web Service (backend + built frontend in a single container, built from the
+# root Dockerfile) plus one managed Postgres database. Review it in the Render dashboard before
+# applying. Nothing here depends on a URL that is only known after deploy: the frontend is served by
+# the backend on the same origin, so there is no CORS or API-URL wiring to do (see DEPLOY.md).
 databases:
   - name: familyid-db
     databaseName: familyid
@@ -9,10 +10,10 @@ databases:
 
 services:
   - type: web
-    name: familyid-backend
+    name: familyid
     env: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
     healthCheckPath: /api/health
     envVars:
@@ -28,9 +29,10 @@ services:
         value: "false"
       - key: DEMO_OTP
         value: "123456"
-      # Set once the frontend service's URL is known, e.g. https://familyid-frontend.onrender.com
+      # Not needed for the app's own requests (same origin). Only set this if another site or a
+      # custom-domain frontend must call the API cross-origin.
       - key: CORS_ORIGINS
-        sync: false
+        value: ""
       # Leave blank to store uploaded documents on local (ephemeral) disk; set all three to use
       # Cloudinary instead, which is strongly recommended in production — see DEPLOY.md.
       - key: CLOUDINARY_CLOUD_NAME
@@ -53,17 +55,6 @@ services:
       # Loads the demo dataset on first boot only if the database is still empty. Never leave this
       # "true" long-term, and never combine with SEED_RESET=true against real data.
       - key: SEED_ON_BOOT
-        value: "false"
+        value: "true"
       - key: SEED_RESET
         value: "false"
-
-  - type: web
-    name: familyid-frontend
-    env: docker
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: ./frontend
-    plan: free
-    envVars:
-      # Set to the backend service's public URL, e.g. https://familyid-backend.onrender.com
-      - key: API_URL
-        sync: false
