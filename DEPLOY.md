@@ -35,16 +35,12 @@ latency), not the external one.
 | Docker build context directory | `backend` |
 | Health check path | `/api/health` |
 
-Environment variables (see [`backend/README.md`](backend/README.md) for the full reference):
-
-| Key | Value |
-|---|---|
-| `DATABASE_URL` | the database's Internal Database URL |
-| `JWT_SECRET` | a long random string — use Render's "Generate" button |
-| `DEV_MODE` | `false` |
-| `CORS_ORIGINS` | leave for now, see step 4 |
-| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | recommended in production — see [Uploaded documents](#uploaded-documents-and-the-ephemeral-filesystem) |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | optional, for email OTP delivery |
+Environment variables — the fastest way is **Environment tab → Add Environment Variable → Add from
+.env**, and paste in [`render-backend.env`](render-backend.env). Fix its three `REPLACE_ME` values
+first: `DATABASE_URL` (the database's Internal Database URL from step 1), `JWT_SECRET` (any long random
+string), and `CORS_ORIGINS` (leave as a placeholder for now — it needs the frontend's URL from step 4,
+which does not exist yet). Everything else in that file already has a working default; see
+[`backend/README.md`](backend/README.md) for what each one does.
 
 Deploy. Once it is live, copy its public URL (`https://familyid-backend-xxxx.onrender.com`).
 
@@ -58,7 +54,8 @@ Deploy. Once it is live, copy its public URL (`https://familyid-backend-xxxx.onr
 | Dockerfile path | `frontend/Dockerfile` |
 | Docker build context directory | `frontend` |
 
-Environment variable:
+Environment variable — paste [`render-frontend.env`](render-frontend.env) via **Add from .env** and
+replace its one placeholder:
 
 | Key | Value |
 |---|---|

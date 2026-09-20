@@ -9,19 +9,78 @@ Cloudinary for documents (falls back to local storage) · mobile or email OTP lo
 
 ## Contents
 
-- [How it works](#how-it-works)
-- [Architecture](#architecture)
-- [Quick start](#quick-start)
-- [Two portals](#two-portals)
-- [Demo logins](#demo-logins-otp-is-123456-in-dev_mode)
-- [Resetting demo data](#resetting-demo-data)
-- [Project layout](#project-layout)
-- [Documents](#documents)
-- [Panel feedback addressed](#panel-feedback-addressed)
-- [Troubleshooting](#troubleshooting)
-- [Deployment](#deployment)
+1. [Problem statement](#1-problem-statement)
+2. [Our solution](#2-our-solution)
+3. [Use cases](#3-use-cases)
+4. [How it works](#4-how-it-works)
+5. [Architecture](#5-architecture)
+6. [Quick start](#6-quick-start)
+7. [Two portals](#7-two-portals)
+8. [Demo logins](#8-demo-logins-otp-is-123456-in-dev_mode)
+9. [Resetting demo data](#9-resetting-demo-data)
+10. [Project layout](#10-project-layout)
+11. [Documents](#11-documents)
+12. [Panel feedback addressed](#12-panel-feedback-addressed)
+13. [Troubleshooting](#13-troubleshooting)
+14. [Deployment](#14-deployment)
 
-## How it works
+## 1. Problem statement
+
+A family in Gujarat today proves who it is separately to every department it deals with. Ration
+records, Aadhaar, birth and marriage certificates, income certificates and disability certificates all
+exist, but nowhere are they combined into one record that a scheme's eligibility can be checked against.
+This causes four concrete problems:
+
+- **The same paperwork, filed again for every scheme.** A family eligible for five schemes submits its
+  identity and income proof five separate times, to five separate offices.
+- **No single source of truth for eligibility.** A department cannot see, at a glance, which of its
+  schemes a household already qualifies for — eligibility is worked out by hand, per application, every
+  time.
+- **Identity fraud is hard to catch.** Nothing stops the same person enrolling twice under a spelling
+  variant of their name, or holding more than one Aadhaar-linked identity, to draw a benefit more than
+  once — a concern raised directly by the review panel (the "Rajesh Kumar / Rakesh Kumar" scenario).
+- **No visibility after a benefit is approved.** A ration or cash benefit can be sanctioned and then
+  simply never reach the family, with no system tracking whether it was actually delivered, and no
+  structured way for the citizen to report it and have the report followed up.
+
+## 2. Our solution
+
+```
+existing records + citizen documents → verification → unified family profile
+    → unique Family ID → eligibility engine → schemes and benefits → continuous updates
+```
+
+The Family ID platform builds one verified family profile per household by combining existing
+government records (Aadhaar, Ration/PDS, civil registration) with documents the citizen uploads,
+resolves any conflicts through an officer verification workflow, and issues a single Family ID once the
+household is confirmed. Every scheme's eligibility rules then run automatically against that one
+profile, so a family sees what it qualifies for without filing anything twice, and a benefit is tracked
+from application through to the citizen confirming they actually received it — with a grievance opened
+automatically if they did not.
+
+## 3. Use cases
+
+- **A new household enrols.** A citizen checks whether a record already exists for them, declares their
+  household size up front, adds each member with a required Aadhaar number (a newborn is the one
+  exception — added with just a birth certificate), uploads supporting documents, and submits for an
+  officer to verify. A unique Family ID is issued once approved.
+- **Automatic scheme matching.** Once verified, the family's profile is checked against every active
+  scheme's rules (age, income, disability, family size, district, and so on), and each member sees a
+  plain-English reason for why they are or are not eligible, and what document is still missing.
+- **Stopping duplicate-identity fraud.** When a new member's name, date of birth, parent's name or
+  Aadhaar closely matches someone already enrolled elsewhere, the system holds it for officer review
+  with a similarity score and the matching evidence, instead of silently allowing a second enrolment.
+- **A life event updates the family automatically.** A birth, marriage, death, divorce or address change
+  is reported once, verified by an officer, and the family's relationships, eligibility and benefits
+  recalculate from it — with the previous state kept as history.
+- **Tracking a benefit to actual delivery.** After approval, a benefit moves through sanctioned →
+  disbursed → delivered, and the citizen confirms receipt. If they say they did not receive it, a
+  grievance is opened automatically with a due date and an escalation path.
+- **Officer oversight across districts.** An officer's console shows pending verification, open
+  duplicate cases, scheme-wise and district-wise eligibility, and a map view — without exposing personal
+  details on the map.
+
+## 4. How it works
 
 ```mermaid
 flowchart TD
@@ -42,7 +101,7 @@ flowchart TD
     E -.-> M
 ```
 
-## Architecture
+## 5. Architecture
 
 ```mermaid
 flowchart LR
@@ -73,24 +132,25 @@ flowchart LR
 
 Backend and frontend are two independent services with no server-side coupling: the browser calls the
 backend directly, and either side can be redeployed, rebuilt or moved without touching the other. See
-[Deployment](#deployment) for how this maps onto two Docker containers plus a managed Postgres instance.
+[Deployment](#14-deployment) for how this maps onto two Docker containers plus a managed Postgres
+instance.
 
-## Quick start
+## 6. Quick start
 
 Requires PostgreSQL 16 running locally, Python 3.12, Node 18+, and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-# database
+# 1. database
 createdb familyid
 
-# backend — http://localhost:8000 (API docs at /docs)
+# 2. backend — http://localhost:8000 (API docs at /docs)
 cd backend
 cp .env.example .env
 uv venv --python 3.12 .venv && uv pip install -r requirements.txt --python .venv/bin/python
 .venv/bin/python -m app.seed --reset
 ./run.sh
 
-# frontend — http://localhost:5173
+# 3. frontend — http://localhost:5173
 cd frontend
 npm install
 npm run dev
@@ -98,7 +158,7 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173) and sign in with any demo login below (OTP `123456`).
 
-## Two portals
+## 7. Two portals
 
 - **Citizen portal** (`/`) — enrol a household, manage members and documents, check scheme eligibility,
   apply for benefits, track delivery status, and raise grievances.
@@ -110,21 +170,21 @@ Open [http://localhost:5173](http://localhost:5173) and sign in with any demo lo
 Which portal you land on after login is decided by your account's role — a citizen always lands on `/`,
 every other role lands on `/officer`.
 
-## Demo logins (OTP is `123456` in DEV_MODE)
+## 8. Demo logins (OTP is `123456` in DEV_MODE)
 
-| Role | Identifier | Notes |
-|---|---|---|
-| Citizen | mobile `9876500001` | Ramesh Patel — verified family in Ahmedabad, has active applications and benefits |
-| Citizen | mobile `9876500002` | Suresh Chauhan — no family yet; a Ration/PDS household is available to claim during enrolment |
-| Service operator | mobile `9000000001` | Kiran Desai |
-| Verification officer | mobile `9000000002` | Bhavna Trivedi |
-| Department officer | mobile `9000000003` | Nilesh Joshi |
-| Admin | mobile `9000000004` or email `admin@familyid.gov.in` | Anita Sharma |
+| # | Role | Identifier | Notes |
+|---|---|---|---|
+| 1 | Citizen | mobile `9876500001` | Ramesh Patel — verified family in Ahmedabad, has active applications and benefits |
+| 2 | Citizen | mobile `9876500002` | Suresh Chauhan — no family yet; a Ration/PDS household is available to claim during enrolment |
+| 3 | Service operator | mobile `9000000001` | Kiran Desai |
+| 4 | Verification officer | mobile `9000000002` | Bhavna Trivedi |
+| 5 | Department officer | mobile `9000000003` | Nilesh Joshi |
+| 6 | Admin | mobile `9000000004` or email `admin@familyid.gov.in` | Anita Sharma |
 
 The login page also has a **Create new citizen** option for a fresh, non-demo account: enter any new
 mobile number or email and a name, and it creates a citizen account on the spot.
 
-## Resetting demo data
+## 9. Resetting demo data
 
 `backend/app/seed.py --reset` drops and rebuilds every table, then reloads the standard demo dataset.
 Run it whenever you want a clean state for a walkthrough:
@@ -138,7 +198,7 @@ grievance, including ones created through the app itself (such as a new citizen 
 login page). Anything you want to keep should be noted down first; there is no undo. Without `--reset`,
 the script only seeds an empty database and otherwise does nothing, so it is safe to run at any time.
 
-## Project layout
+## 10. Project layout
 
 ```
 API_CONTRACT.md          every backend endpoint and payload shape
@@ -148,6 +208,8 @@ DEMO_SCRIPT.md             a ten-minute walkthrough of the full story
 DEPLOY.md                   Render deployment guide
 docker-compose.yml           local Docker network mirroring the production topology
 render.yaml                  Render Blueprint (backend + frontend + managed Postgres)
+render-backend.env           backend environment variables, importable via Render's "Add from .env"
+render-frontend.env          frontend environment variable, importable the same way
 
 backend/
   app/main.py              FastAPI app, router registration, static /uploads mount
@@ -172,46 +234,49 @@ frontend/
   README.md                    frontend setup and structure
 ```
 
-## Documents
+## 11. Documents
 
-- [API_CONTRACT.md](API_CONTRACT.md) — every endpoint and payload
-- [FRONTEND_CONTRACT.md](FRONTEND_CONTRACT.md) — component and page inventory
-- [DESIGN.md](DESIGN.md) — design system brief
-- [DEMO_SCRIPT.md](DEMO_SCRIPT.md) — a ten-minute walkthrough of the full story
-- [DEPLOY.md](DEPLOY.md) — Render deployment guide
-- [backend/README.md](backend/README.md) — backend setup, environment variables, seed details
-- [frontend/README.md](frontend/README.md) — frontend setup and structure
+| Document | Covers |
+|---|---|
+| [API_CONTRACT.md](API_CONTRACT.md) | every endpoint and payload |
+| [FRONTEND_CONTRACT.md](FRONTEND_CONTRACT.md) | component and page inventory |
+| [DESIGN.md](DESIGN.md) | design system brief |
+| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | a ten-minute walkthrough of the full story |
+| [DEPLOY.md](DEPLOY.md) | Render deployment guide |
+| [backend/README.md](backend/README.md) | backend setup, environment variables, seed details |
+| [frontend/README.md](frontend/README.md) | frontend setup and structure |
 
-## Panel feedback addressed
+## 12. Panel feedback addressed
 
-- Full benefit status chain: Eligible → Applied → Under review → Approved → Sanctioned → Disbursed →
-  Delivered → Received, with citizen confirmation of receipt.
-- Grievance and redressal module with due dates, escalation and ratings; "not received" automatically
-  opens a grievance.
-- Multiple-identity fraud (the "Rajesh / Rakesh Kumar" scenario): scored duplicate detection over name
-  variants, date of birth, parent name, mobile, Aadhaar and locality; anything above the review
-  threshold is held for officer decision rather than silently accepted. Aadhaar is required for every
-  member above one year old, with only a newborn exempted (identified by birth certificate).
-- Household size is asked up front, during enrolment, and reconciled against the members actually added.
-- Login by mobile or email OTP, with SMTP credentials pluggable for real email delivery, plus an
-  explicit "create a new citizen account" path from the login screen.
+1. **Full benefit status chain:** Eligible → Applied → Under review → Approved → Sanctioned →
+   Disbursed → Delivered → Received, with citizen confirmation of receipt.
+2. **Grievance and redressal module** with due dates, escalation and ratings; "not received"
+   automatically opens a grievance.
+3. **Multiple-identity fraud** (the "Rajesh / Rakesh Kumar" scenario): scored duplicate detection over
+   name variants, date of birth, parent name, mobile, Aadhaar and locality; anything above the review
+   threshold is held for officer decision rather than silently accepted. Aadhaar is required for every
+   member above one year old, with only a newborn exempted (identified by birth certificate).
+4. **Household size is asked up front**, during enrolment, and reconciled against the members actually
+   added.
+5. **Login by mobile or email OTP**, with SMTP credentials pluggable for real email delivery, plus an
+   explicit "create a new citizen account" path from the login screen.
 
-## Troubleshooting
+## 13. Troubleshooting
 
-- **`createdb: database creation failed`** — PostgreSQL is not running, or a database named `familyid`
-  already exists. Check with `pg_isready` and `psql -l`.
-- **Port already in use** — another instance of the backend (`8000`) or frontend (`5173`) is already
-  running; stop it or pass a different port (`--port` for uvicorn, `--port` for `npm run dev`).
-- **CORS errors in the browser console** — the frontend's `VITE_API_URL` (in `frontend/.env`) does not
-  match where the backend is actually running, or the backend's `CORS_ORIGINS` (in `backend/.env`) does
-  not include the frontend's origin.
-- **PostGIS-related warnings at startup** — PostGIS is optional; the app falls back to plain latitude and
-  longitude columns and works without it.
-- **A page looks empty after signing in** — the demo data may have been reset since you last used it
-  (see [Resetting demo data](#resetting-demo-data)); sign in again with a current demo login, or re-create
-  what you need.
+1. **`createdb: database creation failed`** — PostgreSQL is not running, or a database named `familyid`
+   already exists. Check with `pg_isready` and `psql -l`.
+2. **Port already in use** — another instance of the backend (`8000`) or frontend (`5173`) is already
+   running; stop it or pass a different port (`--port` for uvicorn, `--port` for `npm run dev`).
+3. **CORS errors in the browser console** — the frontend's `VITE_API_URL` (in `frontend/.env`) does not
+   match where the backend is actually running, or the backend's `CORS_ORIGINS` (in `backend/.env`) does
+   not include the frontend's origin.
+4. **PostGIS-related warnings at startup** — PostGIS is optional; the app falls back to plain latitude
+   and longitude columns and works without it.
+5. **A page looks empty after signing in** — the demo data may have been reset since you last used it
+   (see [Resetting demo data](#9-resetting-demo-data)); sign in again with a current demo login, or
+   re-create what you need.
 
-## Deployment
+## 14. Deployment
 
 Both services are containerized: [`backend/Dockerfile`](backend/Dockerfile) (FastAPI, served by
 uvicorn) and [`frontend/Dockerfile`](frontend/Dockerfile) (a Vite build served by nginx, with the API
