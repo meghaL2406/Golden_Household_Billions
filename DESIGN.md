@@ -1,41 +1,128 @@
-# Design system brief — build every screen to this, without exception
+# Design system brief
 
-Quiet, precise, editorial: white surfaces, one blue, lots of air, small confident type, no gradients on content,
-no shadows heavier than a whisper. A well-set financial report, not a SaaS dashboard.
+Every screen in this project is built to this brief, without exception. The look is quiet, precise and
+editorial: white surfaces, one blue, lots of air, small confident type, no gradients on content, no
+shadows heavier than a whisper. Think a well-set financial report, not a SaaS dashboard.
 
-## Tokens (CSS variables)
---blue: #2458e5; --blue-dark: #1947c8; --blue-light: #eef3ff; --ink: #202735; --muted: #637083; --line: #e5e9ef;
---green: #147b65; --paper: #f8fafc (page bg; cards pure #fff). Warning: amber text #7a4b00 on #fff7ea. Danger sparingly: #a8452b.
-Category colours (dots/tags): steel #2c5eea, cement #098875, textiles #bb861b, chemicals #dd7150 — dark text on a 12–15% tint.
+## Tokens
+
+Defined once as CSS custom properties and used everywhere:
+
+```css
+--blue: #2458e5;        /* primary — links, active states, one accent per screen */
+--blue-dark: #1947c8;   /* hover state on primary buttons */
+--blue-light: #eef3ff;  /* active pill fill, soft highlights */
+--ink: #202735;         /* body and heading text */
+--muted: #637083;       /* secondary text, captions, units */
+--line: #e5e9ef;        /* every border, every divider */
+--green: #147b65;       /* success / positive only */
+--paper: #f8fafc;       /* page background; cards sit on it in pure white (#fff) */
+```
+
+Additional tones, used sparingly:
+
+| Tone | Text | Background |
+|---|---|---|
+| Warning | `#7a4b00` | `#fff7ea` |
+| Danger | `#a8452b` | used sparingly, no fixed background |
+
+Sector or category colours (dots, tags) sit at 12–15% tint of the same colour, with dark text on top:
+
+| Category | Colour |
+|---|---|
+| Steel | `#2c5eea` |
+| Cement | `#098875` |
+| Textiles | `#bb861b` |
+| Chemicals | `#dd7150` |
 
 ## Type
-Google Fonts: DM Sans (400,450,500,550,600,650,700) and IBM Plex Mono (400,500). Body DM Sans; 550 for emphasis, 650 for brand; never 700 in content.
-h1 34–40px w600 ls -0.01em ink. h2 13–14px w550, sub-note 10px muted. Body 12–13px. Captions/units/table headers 9–10px muted.
-Stat values 30px w550 tabular-nums; unit 11px muted beside, never inside the number.
-EYEBROWS: every page and card section opens with IBM Plex Mono 10px w500 uppercase ls 0.06em colour #5a6f91, 9px below. IDs, codes, formulas are mono.
 
-## Radii — two families, never mixed on one element
-Chrome/cards 15–18px (cards 18, stat tiles 15–16, dialogs 20). Controls: pills 999px; inputs/selects/buttons 11–12px; tiny tags 4–5px.
+Loaded from Google Fonts: **DM Sans** (weights 400, 450, 500, 550, 600, 650, 700) and **IBM Plex Mono**
+(weights 400, 500). Body text is DM Sans. Weights are fractional on purpose: use 550 for emphasis and
+650 for the brand wordmark; never use bold 700 inside ordinary content.
+
+| Element | Size | Weight | Notes |
+|---|---|---|---|
+| Page title (`h1`) | 34–40px | 600 | letter-spacing -0.01em, ink colour |
+| Section heading (`h2`) | 13–14px | 550 | sub-note beside or under it: 10px, muted |
+| Body text | 12–13px | 400 | |
+| Captions, units, table headers | 9–10px | 400 | muted colour |
+| Big stat values | 30px | 550 | tabular figures; the unit sits beside it at 11px muted, never inside the number |
+
+**Eyebrows:** every page and every card section opens with a mono eyebrow — IBM Plex Mono, 10px, weight
+500, uppercase, letter-spacing 0.06em, colour `#5a6f91`, with 9px of space below it. For example,
+"YOUR EMISSIONS, IN FOCUS" above a "Command Map" heading. IDs, codes, model names and formulas are also
+set in mono.
+
+## Radii
+
+Two distinct radius families, never mixed on the same element:
+
+- **Chrome and cards:** 15–18px (cards 18px, stat tiles 15–16px, dialogs 20px).
+- **Controls:** pills are fully round (999px); inputs, selects and buttons use 11–12px; tiny tags use
+  4–5px.
 
 ## Navbar
-68px, #fff, 1px bottom --line, padding 0 36px, flex space-between gap 16. Left: geometric mark (L-shape 25px tall, 6px --blue stroke, radius 1px, plus 8px square dot) + wordmark DM Sans 28px w650 lowercase with --blue full stop.
-Centre: single pill capsule; items padding 8px 15px radius 999 12.5px w550 #5b6678; hover bg #f2f5fb ink; active bg --blue-light --blue. Six items max.
-Right: mono region label + globe icon (11px), bell button 30px with --blue count badge (17px round, 9.5px w600 white, 2px white ring) when unread>0, gear 30px, avatar 30px (#eef2f8, 10px w600 #536380 initials). Icon buttons borderless #54617a radius 999 hover #f2f5fb. Below 900px capsule collapses to hamburger; bell and gear stay.
+
+A fixed pattern, reused on every page:
+
+- Height 68px, background `#fff`, 1px bottom border in `--line`, horizontal padding 36px, flex layout
+  with `space-between` and a 16px gap. On a map page it floats over the map as a glass bar instead.
+- **Left:** the brand wordmark in DM Sans, 28px, weight 650, lowercase ("leakpoint") with a `--blue`
+  full stop after it, preceded by a small geometric mark built from two `--blue` strokes — an L-shape
+  25px tall with a 6px stroke and 1px radius, plus an 8px square dot.
+- **Centre:** the primary navigation as a single pill capsule. Each item is its own pill: padding
+  8px 15px, radius 999px, 12.5px text at weight 550, colour `#5b6678`. On hover the background becomes
+  `#f2f5fb` with ink text; the active item has background `--blue-light` and `--blue` text. Six items
+  maximum. Secondary destinations (alerts, ledger) do not belong in the nav.
+- **Right:** a mono region label with a small globe icon (11px), a bell icon button (30px) with a
+  `--blue` count badge (17px round, 9.5px weight 600 white text, 2px white ring) shown only when unread
+  count is greater than zero, a settings gear button (30px), and a 30px round avatar (`#eef2f8` fill,
+  10px weight 600 `#536380` initials). Icon buttons are borderless, colour `#54617a`, radius 999px, with
+  a `#f2f5fb` hover background.
+- Below 900px width, the capsule collapses into a hamburger dropdown; the bell and gear stay visible.
 
 ## Layout and components
-Page: max-width ~1180px centred, padding 32px 36px on --paper; header = eyebrow → h1 → 13px muted line, optional action right.
-Cards: #fff, 1px --line, r18, padding 22–24, hover border #a6bdea; no shadow at rest, hover ≤ 0 6px 20px rgba(26,42,74,.12).
-Stat tiles in a row separated by 1px --line verticals (not gaps): label 10px muted + small icon right, value 30px, note 10px muted.
-Tables: 9px uppercase mono headers, 12px rows, 1px --line row borders, no zebra.
-Tags: 9–10px w600, padding 3px 8px, r4, tinted bg + matching dark text. Tones blue, success, warning, neutral, category.
-Buttons: primary --blue fill white r11 padding 10px 16px 12px w550 hover --blue-dark; outline #fff 1px --line ink. Icon 15–16px before label gap 8. No uppercase.
-Inputs/selects 38–42px, 1px --line, r11, 12px; focus 1px --blue border + 2px #dce7ff ring.
-Notices: full-width bar r12 1px border 12px text: info --blue-light with --blue border at 30%; warning amber. One sentence.
-Glass panels (map): rgba(255,255,255,.86) blur(18px) 1px rgba(210,221,238,.9) r22; inner stat tiles r16.
-Empty states: centred, icon 30px in soft tile, one h2, one sentence, one primary button.
-Motion 0.18–0.22s ease on hover/border/colour only. Spacing scale 4,6,8,12,16,22,32,44. Prefer air over dividers.
+
+- **Page:** content is centred at a max width of roughly 1180px, with 32px 36px padding on the
+  `--paper` background. The page header is eyebrow → `h1` → a one-line description (13px, muted), with
+  an optional action on the right.
+- **Cards:** `#fff` background, 1px `--line` border, 18px radius, 22–24px padding, hover border
+  `#a6bdea`. No shadow at rest; on hover, at most `0 6px 20px rgba(26,42,74,0.12)`.
+- **Stat tiles in a row:** separated by 1px `--line` vertical dividers, not by gaps. Each tile has a
+  10px muted label with a small icon at the right, a 30px value, and a one-line 10px muted note beneath.
+- **Tables:** 9px uppercase mono column headers, 12px rows, 1px `--line` row borders, no zebra striping.
+- **Tags:** 9–10px text at weight 600, padding 3px 8px, radius 4px, a tinted background with matching
+  dark text. Tones: blue, success (green), warning (amber), neutral (grey), plus the sector colours
+  above.
+- **Buttons:** primary is a `--blue` fill with white text, 11px radius, 10px 16px padding, 12px text at
+  weight 550, hovering to `--blue-dark`. The outline variant is `#fff` with a 1px `--line` border and
+  ink text. An icon (15–16px) sits before the label with an 8px gap. Buttons are never uppercase.
+- **Inputs and selects:** 38–42px tall, 1px `--line` border, 11px radius, 12px text. Focus state is a
+  1px `--blue` border plus a 2px `#dce7ff` ring — never a second inner ring.
+- **Notices:** a full-width bar, 12px radius, 1px border, 12px text. Info tone uses `--blue-light` with
+  a `--blue` border at 30% opacity; warning tone uses amber. One sentence only — disclose a caveat once
+  per page, never repeated beside the number it qualifies.
+- **Floating drawer or panel** (used on map pages): glass effect — background
+  `rgba(255,255,255,0.86)` with `backdrop-filter: blur(18px)`, a 1px `rgba(210,221,238,0.9)` border, and
+  22px radius. Stat tiles inside it use a faint vertical white gradient and 16px radius.
+- **Floating assistant launcher:** fixed to the bottom-right at 24px, a `--blue` pill 52px tall with a
+  sparkle icon and label, white text, and a soft shadow of `0 10px 30px rgba(36,88,229,0.28)`. It hides
+  below 680px width when open.
+- **Empty states:** centred, a 30px icon in a soft tile, one `h2`, one sentence, and one primary button.
+- **Motion:** 0.18–0.22s ease transitions on hover, border and colour only. Nothing bounces.
+- **Spacing scale:** 4, 6, 8, 12, 16, 22, 32, 44px. Prefer air over dividers wherever both would work.
 
 ## Non-negotiables
-One accent per screen; charts use --blue and #9fb6ea, --line grid. Every number carries its unit in muted text.
-WCAG AA 4.5:1; focus visible; no colour-only meaning. Plain declarative sentences, no exclamation marks, no emoji, no lorem.
-Before finishing a screen check: eyebrow present, radii from the right family, only --line borders, units outside numbers, hover state on every clickable card.
+
+- One accent colour per screen. Charts use `--blue` and `#9fb6ea` for series, with `--line` for the
+  grid.
+- Every number carries its unit in muted text, and its source in a caption or an evidence panel.
+- WCAG 2.1 AA contrast: 4.5:1 for all text (`--muted` on white passes this; never go lighter than
+  `#5c6a80` on white). Focus must be visible on every interactive element, and meaning is never conveyed
+  by colour alone.
+- Copy is written in plain, declarative sentences: no exclamation marks, no emoji in interface text
+  (emoji are allowed only as map-layer pictograms), and no placeholder lorem ipsum text.
+
+Before finishing any screen, check: an eyebrow is present, radii come from the correct family, only
+`--line` is used for borders, units sit outside numbers, and every clickable card has a hover state.

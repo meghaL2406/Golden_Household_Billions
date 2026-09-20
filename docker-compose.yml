@@ -1,0 +1,60 @@
+# Local Docker network that mirrors the production topology (separate backend/frontend/database
+# services talking over HTTP), useful for testing the two Dockerfiles before deploying them.
+# Run: docker compose up --build
+# Frontend: http://localhost:8080   Backend: http://localhost:8000/docs
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: familyid
+      POSTGRES_USER: familyid
+      POSTGRES_PASSWORD: familyid
+    volumes:
+      - familyid_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U familyid -d familyid"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://familyid:familyid@db:5432/familyid
+      JWT_SECRET: dev-only-secret-change-me
+      DEV_MODE: "true"
+      DEMO_OTP: "123456"
+      CORS_ORIGINS: http://localhost:8080,http://localhost:5173
+      SEED_ON_BOOT: "true"
+      PORT: "8000"
+    volumes:
+      - familyid_uploads:/app/uploads
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      # The browser calls this URL directly, so it must be reachable from the host machine —
+      # the frontend container itself never talks to `backend` over the compose network.
+      API_URL: http://localhost:8000
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+
+volumes:
+  familyid_db_data:
+  familyid_uploads:

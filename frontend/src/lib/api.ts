@@ -1,5 +1,16 @@
+declare global {
+  interface Window {
+    __ENV__?: { VITE_API_URL?: string };
+  }
+}
+
+// Resolution order: runtime config injected by the Docker container at start-up (public/env-config.js,
+// written by docker-entrypoint.sh) → the value baked in at build time by Vite → the local dev default.
+// The runtime path lets one built Docker image be pointed at any backend without a rebuild.
 export const API_URL: string =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
+  (typeof window !== "undefined" && window.__ENV__?.VITE_API_URL) ||
+  (import.meta.env.VITE_API_URL as string | undefined) ||
+  "http://localhost:8000";
 
 export const AUTH_STORAGE_KEY = "familyid.auth";
 

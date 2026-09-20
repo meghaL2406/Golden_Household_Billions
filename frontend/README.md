@@ -25,7 +25,7 @@ npm run dev             # http://localhost:5173
   `format.ts` (formatting helpers), `hooks.ts` (`useApi`, toasts, misc hooks)
 - `src/components/` — shared design-system components (see `../FRONTEND_CONTRACT.md`)
 - `src/layouts/` — `CitizenLayout`, `OfficerLayout`, shared navbar/footer shell
-- `src/pages/auth/` — OTP login
+- `src/pages/auth/` — OTP login and sign-up, with a toggle between signing in and creating a new citizen account
 - `src/pages/citizen/`, `src/pages/officer/` — feature pages
 - `src/routes/citizen.tsx`, `src/routes/officer.tsx` — route tables consumed by `App.tsx`
 
