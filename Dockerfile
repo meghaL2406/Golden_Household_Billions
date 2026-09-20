@@ -1,6 +1,8 @@
 # Family ID — single-service image: the FastAPI backend serves both the REST API and the built
-# React frontend from one process, on one port. One Render Web Service, one origin, no CORS to
-# configure. Build context: repo root (e.g. `docker build -t familyid .`).
+# React frontend from one process on one port, and can run its own embedded PostgreSQL when no
+# external database is configured. Add this repository to Render as a Docker Web Service with no
+# environment variables and it comes up with a seeded demo; give it DATABASE_URL (render.yaml does)
+# and it uses managed Postgres instead. Build context: repo root.
 #
 # For two independently-scalable services instead, see backend/Dockerfile and frontend/Dockerfile,
 # and DEPLOY.md "Option B".
@@ -17,8 +19,11 @@ RUN npm run build
 
 # ---------------------------------------------------------------- stage 2: backend + serve the build
 FROM python:3.12-slim
+
+# postgresql-15: embedded database used only when DATABASE_URL is not provided (pg_trgm is included).
+# libpq5 for psycopg; curl for the HEALTHCHECK.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl libpq5 \
+    && apt-get install -y --no-install-recommends curl libpq5 postgresql-15 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -32,17 +37,23 @@ COPY docker-entrypoint.sh /docker-entrypoint.sh
 
 RUN chmod +x /docker-entrypoint.sh \
     && useradd --create-home --uid 10001 appuser \
-    && mkdir -p /app/uploads \
+    && mkdir -p /app/data/pgdata /app/data/uploads \
+    && rm -rf /app/uploads && ln -s /app/data/uploads /app/uploads \
     && chown -R appuser:appuser /app
 
-USER appuser
+# The entrypoint starts as root only to fix ownership of a mounted /app/data, then drops to appuser.
+ENV PORT=8000 \
+    WEB_CONCURRENCY=2 \
+    DATA_DIR=/app/data \
+    PGDATA=/app/data/pgdata \
+    PG_BIN=/usr/lib/postgresql/15/bin \
+    SEED_ON_BOOT=true \
+    PYTHONUNBUFFERED=1
 
-# Render (and most PaaS Docker runners) assign the listen port at run time via $PORT and route
-# traffic to it; 8000 is only the documented local default; the entrypoint always binds to $PORT.
-ENV PORT=8000
+VOLUME ["/app/data"]
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${PORT}/api/health" || exit 1
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

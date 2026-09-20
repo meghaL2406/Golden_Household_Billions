@@ -5,7 +5,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    DATABASE_URL: str = "postgresql+psycopg://mac@localhost:5432/familyid"
+    # No implicit localhost default: an unset value must fail loudly (see app.core.database) rather
+    # than silently trying 127.0.0.1 on a server that has no database.
+    DATABASE_URL: str = ""
     JWT_SECRET: str = "change-me"
     JWT_EXPIRE_MINUTES: int = 720
     DEV_MODE: bool = True

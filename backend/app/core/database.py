@@ -3,6 +3,13 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
 
 from .config import settings
 
+if not settings.DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set. Locally: copy backend/.env.example to backend/.env and point it at "
+        "your PostgreSQL. In Docker: leave it unset and the container starts an embedded PostgreSQL, "
+        "or set it to a managed database URL (render.yaml wires this automatically)."
+    )
+
 engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
