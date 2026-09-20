@@ -147,6 +147,8 @@ of which executes the lifespan.
 | `app/routers/grievances.py` | Grievance lifecycle with escalation, resolution, rating |
 | `app/routers/dashboard.py` | Summary counts, district/scheme/application/benefit/case reports, map endpoints |
 | `app/routers/admin.py` | Audit log query, user management, enum metadata |
+| `app/routers/assistant.py` | AI assistant, **mock**: `/assistant/status` and `/assistant/chat` with fixed, role-aware sample answers and page links; the contract is final, the answer generator is the placeholder |
+| `app/main.py` (`/api/ping`) | Unauthenticated, database-free keep-alive target for external monitors (GET and HEAD) |
 | `app/services/eligibility.py` | Rule evaluation and family-wide recalculation |
 | `app/services/duplicates.py` | Duplicate person/family scoring, case opening, automatic checks |
 | `app/services/relationships.py` | Inverse relationship types and impossible-relationship detection |
@@ -378,6 +380,11 @@ held.
 - **Pages.** Citizen: Home, six-step Enrol wizard, Family profile, Schemes, Scheme apply,
   Applications, Benefits, Support, Notifications. Officer: Dashboard, Families, Cases, Schemes (rule
   builder), Applications, Benefits, Grievances, Reports, Map, Audit, Users.
+- **Assistant (preview).** `src/components/Assistant.tsx` is mounted in both layouts: a floating
+  launcher (bottom-right, labelled "Soon") opens a panel that shows the "coming soon" notice, role
+  specific suggested questions from `/assistant/status`, and a conversation backed by
+  `/assistant/chat`. Replies may carry page links rendered as pills. Swapping the backend's mock
+  generator for a model changes nothing in this component.
 
 ## 8. Security, privacy and audit
 
@@ -479,6 +486,10 @@ Frontend: `VITE_API_URL` at build time, or `API_URL` at runtime for the two-serv
 
 ## 12. Extension points
 
+- **AI assistant**: replace `_mock_reply` in `app/routers/assistant.py` with a language-model call.
+  The natural context is the caller's family profile (`family_detail`), their `scheme_eligibility`
+  rows with reasons, and the scheme rules; keep answers grounded in those records and return page
+  links in the existing `links` shape. Flip `available` to `true` in `/assistant/status` when live.
 - **Real source integrations**: implement a client in `app/services/external.py` returning the
   same payload keys (`name`, `date_of_birth`, `gender`, `father_name`, …); nothing downstream changes.
 - **SMS OTP**: add a sender in `app/services/otp.py` next to `send_email`.

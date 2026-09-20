@@ -79,6 +79,10 @@ automatically if they did not.
 - **Officer oversight across districts.** An officer's console shows pending verification, open
   duplicate cases, scheme-wise and district-wise eligibility, and a map view — without exposing personal
   details on the map.
+- **AI assistant (coming soon).** A floating assistant in both portals answers questions about
+  eligibility, documents, life events, benefits and grievances and links to the right page. It is a
+  preview: the API and the panel are in place, and answers come from fixed samples until a language
+  model is connected.
 
 ## 4. How it works
 
@@ -298,6 +302,11 @@ Try the exact image locally, either self-contained or with a separate Postgres:
 docker build -t familyid . && docker run --rm -p 8000:8000 familyid   # embedded database
 docker compose up --build                                               # separate Postgres
 ```
+
+**Keeping a free instance awake.** Render's free web services spin down after 15 minutes without
+traffic, and the next visitor waits for a cold start. Point an external monitor such as UptimeRobot at
+`https://<your-service>.onrender.com/api/ping` every 5 to 10 minutes; the endpoint needs no login,
+touches no database, answers `GET` and `HEAD`, and returns `{"ok": true, "at": "..."}`.
 
 Then open [http://localhost:8000](http://localhost:8000) (API docs at `/docs`). A two-service layout
 ([`backend/Dockerfile`](backend/Dockerfile) + [`frontend/Dockerfile`](frontend/Dockerfile)) remains

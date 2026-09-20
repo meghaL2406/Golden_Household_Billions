@@ -127,3 +127,12 @@ SERVICE_OPERATOR   mobile 9000000001
 VERIFICATION_OFFICER mobile 9000000002
 DEPARTMENT_OFFICER mobile 9000000003
 ADMIN              mobile 9000000004  / email admin@familyid.gov.in
+
+## ops  (backend/app/main.py)
+GET  /api/health -> {status:"ok", cloudinary, smtp, dev_mode}  (no auth)
+GET|HEAD /api/ping -> {ok:true, at}  (no auth, no database access) — keep-alive target for external monitors such as UptimeRobot; poll every 5–10 minutes to prevent free-tier spin-down.
+
+## assistant — mock, "coming soon"  (backend/app/routers/assistant.py)
+GET  /assistant/status -> {available:false, mode:"mock", title, message, suggestions[]}  (role-specific suggestions)
+POST /assistant/chat {message} -> {reply, links:[{label,to}], mock:true, at}
+     Answers come from fixed keyword rules until a language model is connected; the shapes above are final.

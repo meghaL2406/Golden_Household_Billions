@@ -1,4 +1,5 @@
 export { Eyebrow } from "./Eyebrow";
+export { Assistant } from "./Assistant";
 export { PageHeader } from "./PageHeader";
 export type { PageHeaderProps } from "./PageHeader";
 export { Card } from "./Card";

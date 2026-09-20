@@ -107,8 +107,18 @@ A fixed pattern, reused on every page:
   `rgba(255,255,255,0.86)` with `backdrop-filter: blur(18px)`, a 1px `rgba(210,221,238,0.9)` border, and
   22px radius. Stat tiles inside it use a faint vertical white gradient and 16px radius.
 - **Floating assistant launcher:** fixed to the bottom-right at 24px, a `--blue` pill 52px tall with a
-  sparkle icon and label, white text, and a soft shadow of `0 10px 30px rgba(36,88,229,0.28)`. It hides
-  below 680px width when open.
+  sparkle icon and the label "Assistant", white text, and a soft shadow of
+  `0 10px 30px rgba(36,88,229,0.28)`. While the assistant is a preview it carries a small mono
+  "SOON" chip (9px, uppercase, white at 18% tint). It hides below 680px width when the panel is open.
+- **Assistant panel (preview):** a card anchored above the launcher — 380px wide (full width minus
+  16px gutters on phones), `#fff`, 1px `--line`, 18px radius, the hover-level shadow, 18px padding.
+  Order inside: eyebrow "AI ASSISTANT" → `h2` "Family ID assistant" with a warning-tone tag
+  "Coming soon" → one info notice stating that answers are samples → the conversation → suggested
+  questions as pills (only before the first question) → a 40px input with a primary icon button.
+  Messages are 12.5px on 12px-radius bubbles: assistant bubbles on `--paper` with a `--line`
+  border, aligned left; user bubbles on `--blue-light` in `--blue`, aligned right. Page links
+  returned with an answer render as pills with a small arrow. Nothing in the panel animates except
+  the 0.18s fade on open.
 - **Empty states:** centred, a 30px icon in a soft tile, one `h2`, one sentence, and one primary button.
 - **Motion:** 0.18–0.22s ease transitions on hover, border and colour only. Nothing bounces.
 - **Spacing scale:** 4, 6, 8, 12, 16, 22, 32, 44px. Prefer air over dividers wherever both would work.

@@ -1,4 +1,5 @@
 import { Outlet } from "react-router-dom";
+import { Assistant } from "../components/Assistant";
 import { Navbar } from "../components/Navbar";
 import { AppFooter } from "./AppFooter";
 
@@ -21,6 +22,7 @@ export function OfficerLayout(): JSX.Element {
         </div>
       </main>
       <AppFooter />
+      <Assistant />
     </div>
   );
 }

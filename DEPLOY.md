@@ -94,6 +94,24 @@ into the service's **Environment → Add from .env**:
 | `CORS_ORIGINS` | empty (same origin) | another site must call the API |
 | `WEB_CONCURRENCY` | `2` | tuning; keep 1–2 on the free instance |
 
+## Keeping a free instance awake
+
+Free web services spin down after 15 minutes without traffic; the next visitor then waits through a
+cold start (the embedded database also restarts and reseeds on a plain web service). To prevent it,
+add a monitor that requests the service every 5 to 10 minutes:
+
+| Setting | Value |
+|---|---|
+| Monitor type | HTTP(s) |
+| URL | `https://<your-service>.onrender.com/api/ping` |
+| Interval | 5 minutes (UptimeRobot's free minimum) — anything under 15 works |
+| Method | GET (HEAD is also accepted) |
+| Expected | HTTP 200, body `{"ok": true, "at": "..."}` |
+
+`/api/ping` needs no authentication and does not touch the database, so it is safe to expose and
+cheap to poll. `/api/health` also works but reports configuration flags; prefer `/api/ping` for
+monitors.
+
 ## Verifying and troubleshooting
 
 - **Health**: `https://<service>.onrender.com/api/health` returns `{"status":"ok", ...}`; the API

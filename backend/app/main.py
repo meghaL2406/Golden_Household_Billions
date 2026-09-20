@@ -39,7 +39,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(families.router, prefix="/api")
 
 for _name in ("documents", "verification", "life_events", "schemes", "applications", "benefits",
-              "grievances", "notifications", "dashboard", "admin"):
+              "grievances", "notifications", "dashboard", "admin", "assistant"):
     try:
         _mod = __import__(f"app.routers.{_name}", fromlist=["router"])
         app.include_router(_mod.router, prefix="/api")
@@ -58,6 +58,16 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 @app.get("/api/health")
 def health():
     return {"status": "ok", "cloudinary": settings.cloudinary_enabled, "smtp": settings.smtp_enabled, "dev_mode": settings.DEV_MODE}
+
+
+@app.get("/api/ping", include_in_schema=True, tags=["ops"])
+@app.head("/api/ping", include_in_schema=False)
+def ping():
+    """Keep-alive target for external monitors (for example UptimeRobot). No authentication, no
+    database access, minimal body; GET and HEAD both return 200. Poll it every 5 to 10 minutes to
+    stop a free-tier host from spinning the service down."""
+    from datetime import datetime, timezone
+    return {"ok": True, "at": datetime.now(timezone.utc).isoformat()}
 
 
 # ---------------------------------------------------------------------------- single-service deploy
